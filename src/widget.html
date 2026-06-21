@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>录制控制</title>
+    <link rel="stylesheet" href="./widget.css" />
+  </head>
+  <body>
+    <main class="widget">
+      <div class="drag-zone">
+        <span id="dot" class="dot"></span>
+        <span id="stateText" class="state-text">准备录制</span>
+        <span id="timer" class="timer">00:00:00</span>
+        <span id="remainingTime" class="remaining-time" hidden></span>
+        <span id="audioLabel" class="audio-label">系统声音</span>
+        <div class="wave" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="pause">暂停</button>
+        <button id="resume" hidden>继续</button>
+        <button id="stop" class="stop">停止</button>
+      </div>
+    </main>
+    <script src="./widget.js"></script>
+  </body>
+</html>

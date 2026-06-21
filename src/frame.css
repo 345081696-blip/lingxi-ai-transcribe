@@ -1,0 +1,176 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+#stage,
+.frame {
+  width: 100vw;
+  height: 100vh;
+}
+
+.frame {
+  position: relative;
+  border: 1px solid rgba(255, 204, 0, 0.78);
+  box-shadow:
+    0 0 5px rgba(255, 204, 0, 0.2);
+  user-select: none;
+  -webkit-app-region: no-drag;
+}
+
+.frame.recording {
+  border-color: rgba(255, 45, 45, 0.56);
+  box-shadow: 0 0 4px rgba(255, 45, 45, 0.14);
+  animation: framePulse 1.2s steps(2, end) infinite;
+}
+
+.frame.paused {
+  border-color: #ffcc00;
+  animation: none;
+  box-shadow:
+    0 0 5px rgba(255, 204, 0, 0.2);
+}
+
+.drag-handle {
+  position: absolute;
+  left: 50%;
+  top: 6px;
+  width: 118px;
+  height: 22px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 999px;
+  background: rgba(10, 14, 20, 0.78);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+  cursor: move;
+  -webkit-app-region: drag;
+}
+
+body.is-recording .label,
+body.is-recording .mode-button,
+body.is-recording .start-button,
+body.is-recording .stop-button,
+body.is-recording .drag-handle,
+body.is-recording .resize-hint {
+  display: none;
+}
+
+body.is-paused .label,
+body.is-paused .drag-handle,
+body.is-paused .mode-button,
+body.is-paused .stop-button,
+body.is-paused .resize-hint {
+  display: block;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 7px;
+  background: rgba(10, 14, 20, 0.76);
+  color: white;
+  font-size: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-app-region: no-drag;
+}
+
+.label span {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mode-button {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: rgba(10, 14, 20, 0.76);
+  color: white;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.mode-button:hover {
+  border-color: #ff4d4d;
+}
+
+.start-button {
+  position: absolute;
+  right: 10px;
+  top: 48px;
+  border: 1px solid rgba(67, 214, 200, 0.7);
+  border-radius: 7px;
+  padding: 7px 12px;
+  background: rgba(20, 184, 166, 0.86);
+  color: #04100f;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.start-button:hover {
+  background: rgba(67, 214, 200, 0.95);
+}
+
+.stop-button {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  border: 1px solid rgba(255, 95, 86, 0.54);
+  border-radius: 7px;
+  padding: 6px 10px;
+  background: rgba(120, 38, 37, 0.72);
+  color: #ffd8d6;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.stop-button:hover {
+  border-color: rgba(255, 120, 112, 0.9);
+}
+
+.resize-hint {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 22px;
+  height: 22px;
+  border-right: 3px solid white;
+  border-bottom: 3px solid white;
+  opacity: 0.9;
+  pointer-events: none;
+}
+
+@keyframes framePulse {
+  0% {
+    border-color: rgba(255, 45, 45, 0.44);
+  }
+  50% {
+    border-color: rgba(255, 255, 255, 0.26);
+  }
+  100% {
+    border-color: rgba(255, 45, 45, 0.44);
+  }
+}

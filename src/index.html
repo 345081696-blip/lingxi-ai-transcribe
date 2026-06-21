@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self' blob:; script-src 'self'; style-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>零创AI 智能转写器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-logo-slot" aria-hidden="true">
+            <img src="../assets/app-icon-256.png" alt="" />
+          </div>
+          <h1>零创AI 智能转写器</h1>
+          <p class="muted">录屏或导入音视频，转成简体中文文档。</p>
+        </div>
+        <div class="settings">
+          <label>
+            <span>识别语言</span>
+            <select id="language">
+              <option value="auto">自动判断</option>
+              <option value="zh">中文</option>
+              <option value="en">英文</option>
+            </select>
+          </label>
+          <label>
+            <span>模型</span>
+            <select id="model">
+              <option value="small">small：平衡速度</option>
+              <option value="medium">medium：更准</option>
+              <option value="base">base：更快</option>
+            </select>
+          </label>
+          <label>
+            <span>整理方式</span>
+            <select id="style">
+              <option value="verbatim">尽量保留原文</option>
+              <option value="clean">清理废话并保留重点</option>
+              <option value="outline">提炼成提纲</option>
+            </select>
+          </label>
+          <label>
+            <span>字幕辅助</span>
+            <select id="subtitleMode">
+              <option value="off">关闭</option>
+              <option value="auto">自动识别底部字幕</option>
+            </select>
+          </label>
+          <label>
+            <span>重复内容去重</span>
+            <select id="dedupeMode">
+              <option value="normal">普通去重</option>
+              <option value="off">关闭</option>
+              <option value="strong">强力去重</option>
+            </select>
+          </label>
+          <label>
+            <span>智能整理</span>
+            <select id="organizer">
+              <option value="local">本机规则整理</option>
+              <option value="openclaw">OpenClaw/Qwen 增强整理</option>
+              <option value="localai">本地大模型直连</option>
+            </select>
+          </label>
+          <label class="localai-field">
+            <span>本地模型地址</span>
+            <input id="localAiBaseUrl" list="localAiBaseUrlPresets" placeholder="默认 http://127.0.0.1:11434" />
+            <datalist id="localAiBaseUrlPresets"></datalist>
+          </label>
+          <label class="localai-field">
+            <span>本地模型名称</span>
+            <input id="localAiModel" list="localAiModelPresets" placeholder="例如 qwen3.5:35b-a3b-coding-nvfp4" />
+            <datalist id="localAiModelPresets"></datalist>
+          </label>
+          <label class="openclaw-field">
+            <span>OpenClaw 模型</span>
+            <input id="openclawModel" placeholder="例如 qwen/qwen3.5，留空用 OpenClaw 默认模型" />
+          </label>
+          <label class="openclaw-field">
+            <span>OpenClaw 命令</span>
+            <div class="inline-control">
+              <input id="openclawCommand" placeholder="留空自动检测，或选择 openclaw 命令文件" />
+              <button id="chooseOpenClawCommand" type="button">选择</button>
+            </div>
+          </label>
+          <div class="openclaw-status openclaw-field">
+            <div class="status-actions">
+              <button id="checkOpenClaw" type="button">检测</button>
+              <button id="testOpenClaw" type="button">测试模型</button>
+              <button id="copyDiagnostics" type="button">复制诊断</button>
+            </div>
+            <span id="openclawStatus">未检测</span>
+          </div>
+          <div class="openclaw-status localai-field">
+            <div class="status-actions">
+              <button id="checkLocalAi" type="button">检测</button>
+              <button id="testLocalAi" type="button">测试模型</button>
+              <button id="copyLocalAiDiagnostics" type="button">复制诊断</button>
+            </div>
+            <span id="localAiStatus">未检测</span>
+          </div>
+          <label>
+            <span>录制声音</span>
+            <select id="audioMode">
+              <option value="system">系统声音</option>
+              <option value="microphone">外部声音</option>
+            </select>
+          </label>
+          <label>
+            <span>录制范围</span>
+            <select id="captureMode">
+              <option value="region">框选范围</option>
+              <option value="screen">全屏录制</option>
+            </select>
+          </label>
+          <label>
+            <span>录制定时</span>
+            <div class="inline-control timer-control">
+              <select id="recordingDuration">
+                <option value="0">不限时</option>
+                <option value="300">5 分钟</option>
+                <option value="600">10 分钟</option>
+                <option value="1800">30 分钟</option>
+                <option value="3600">1 小时</option>
+                <option value="7200">2 小时</option>
+                <option value="custom">自定义</option>
+                <option value="calculated">按视频时长计算</option>
+              </select>
+              <input id="customDurationMinutes" type="text" inputmode="numeric" placeholder="00:00:00" disabled />
+            </div>
+            <div id="durationCalculator" class="duration-calculator" hidden>
+              <input id="sourceVideoDuration" type="text" inputmode="text" placeholder="视频时长，如 01:30 或 90 分钟" />
+              <select id="playbackSpeed">
+                <option value="1">1.0 倍</option>
+                <option value="1.25">1.25 倍</option>
+                <option value="1.5">1.5 倍</option>
+                <option value="1.75">1.75 倍</option>
+                <option value="2">2.0 倍</option>
+                <option value="3">3.0 倍</option>
+              </select>
+              <span id="durationHint">输入视频时长后自动计算录制时长。</span>
+            </div>
+          </label>
+          <label class="check-row">
+            <input id="autoTranscribe" type="checkbox" checked />
+            <span>录制停止后自动开始转录</span>
+          </label>
+          <label class="check-row">
+            <input id="promptForNames" type="checkbox" checked />
+            <span>完成后弹窗命名</span>
+          </label>
+          <label>
+            <span>重新转写保存方式</span>
+            <select id="rewriteMode">
+              <option value="keep">保留新版本</option>
+              <option value="overwrite">覆盖重新转写结果</option>
+            </select>
+          </label>
+        </div>
+        <div class="notice">
+          <strong>两段式流程</strong>
+          <p>Whisper 负责识别语音；智能整理可独立本机运行，也可手动接入 OpenClaw 或直连本地大模型。</p>
+        </div>
+        <div class="notice legal">
+          <strong>版权</strong>
+          <p>© 2026 零创AI 智能转写器。录制和转写前请确认你拥有相关内容的合法使用权。</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <button id="pickMedia" class="primary">上传短视频/音频</button>
+          <button id="loadSources" class="primary">选择录屏范围</button>
+          <button id="rewriteMedia">重新转写</button>
+          <button id="showHelp">使用说明</button>
+          <button id="pauseRecording" disabled>暂停录制</button>
+          <button id="adjustRecordingFrame" hidden disabled>调整录屏范围</button>
+          <button id="resumeRecording" hidden disabled>继续录制</button>
+          <button id="stopRecording" class="danger" disabled>停止录制</button>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>任务</h2>
+            <button id="openOutput">打开输出目录</button>
+          </div>
+          <div id="jobs" class="jobs empty">暂无任务</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>状态</h2>
+            <button id="showStatusLog" type="button">查看历史日志</button>
+          </div>
+          <pre id="status">正在检查本机环境...</pre>
+        </section>
+      </section>
+      <div id="version" class="version">v0.2.21</div>
+    </main>
+    <dialog id="helpDialog" class="help-dialog">
+      <div class="help-card">
+        <div class="help-head">
+          <h2>使用说明</h2>
+          <button id="closeHelp" type="button">关闭</button>
+        </div>
+        <div class="help-content">
+          <h3>录制在线播放内容</h3>
+          <p>先选择“系统声音”或“外部声音”，再选择“框选范围”或“全屏录制”。点击“选择录屏范围”后调整线框，确认范围后再开始录制；悬浮条可暂停、继续、停止，主界面最小化或关闭也不应中断后台任务。</p>
+          <h3>录制范围</h3>
+          <p>框选模式可拖动上方移动柄，或用边角调整大小。暂停时可调整录屏范围，继续录制会按新范围采集；全屏模式下可用退出全屏回到框选模式。</p>
+          <h3>定时与倍速</h3>
+          <p>录制定时支持不限时、固定时长、自定义时长，也支持“按视频时长计算”。自定义时长可输入 00:30:00、30:00 或 30，软件按时分秒理解；输入原视频时长并选择 1.0 到 3.0 倍播放速度，软件会自动计算录制时长，到点停止并按设置自动转写。</p>
+          <h3>上传或重新转写</h3>
+          <p>“上传短视频/音频”用于导入本地文件。“重新转写”用于选择已录制的视频重新生成文档，可按当前语言、模型、字幕辅助、整理方式执行，并可选择保留新版本或覆盖重新转写结果。</p>
+          <h3>字幕辅助</h3>
+          <p>字幕辅助可关闭，也可自动识别视频底部字幕。开启后会把字幕识别结果作为参考信息，帮助修正语音口误、发音不清或倍速播放带来的识别误差。</p>
+          <h3>重复内容去重</h3>
+          <p>重复内容去重用于处理在线播放卡顿、回放、跳回开头造成的重复录制。普通去重为默认模式，只移除高度相似的重复片段；强力去重会扩大检查范围，适合重复严重的录制，但可能误删主播有意重复强调的内容。关闭后保留全部识别文本。</p>
+          <p>去重只能删除已经录到的重复内容，不能恢复因为卡顿或跳播没有录到的部分。使用 OpenClaw 或本地大模型整理时，软件会提示模型发现明显断点时标注可能存在内容缺失。</p>
+          <h3>语言与模型</h3>
+          <p>识别语言默认自动判断。base 更快，small 平衡速度和准确率，medium 更准但更慢；倍速较高或内容重要时，建议优先使用 small 或 medium。</p>
+          <h3>智能整理</h3>
+          <p>智能整理有三种模式。本机规则整理不需要额外模型，任何电脑都能用。OpenClaw/Qwen 增强整理需要安装 OpenClaw，模型栏填写 OpenClaw 可识别的模型 ID，例如 ollama/qwen3.5:35b-a3b-coding-nvfp4，命令栏可留空自动检测或手动选择 openclaw 命令文件。</p>
+          <p>本地大模型直连不经过 OpenClaw，适合只安装了 Ollama、LM Studio 或 llama.cpp server 的电脑。Ollama 默认地址是 http://127.0.0.1:11434；模型名称不是文件路径，而是 ollama list 或 /v1/models 里看到的模型 ID，例如 qwen3.5:35b-a3b-coding-nvfp4。点击“检测”会读取 /v1/models，点击“测试模型”会发送一句短测试；成功后地址和模型名称会保存在下拉选择里。</p>
+          <p>如果换电脑使用，先确认本地模型服务已启动，再复制模型名称到对应输入框。检测或测试失败时，软件会在转写时自动回退到本机规则整理，不会中断文档生成；处理报告会写明实际使用状态和失败原因。</p>
+          <h3>任务与输出</h3>
+          <p>任务列表显示处理状态、进度条和转录时间进度，可开始或停止转录。结果按钮可打开 Markdown、TXT、DOCX 和输出文件夹；删除任务只移除列表记录，不删除原视频或已生成文件。</p>
+          <h3>命名与权限</h3>
+          <p>左侧“完成后弹窗命名”默认开启，录制停止后提示命名录制文件，转写完成后提示命名输出文件夹；取消或留空会保留默认名称。首次使用可能需要授予屏幕录制、系统音频和麦克风权限。</p>
+        </div>
+      </div>
+    </dialog>
+    <dialog id="nameDialog" class="help-dialog name-dialog">
+      <form method="dialog" class="help-card">
+        <div class="help-head">
+          <h2 id="nameDialogTitle">命名</h2>
+          <button id="nameCancel" type="button">取消</button>
+        </div>
+        <div class="help-content">
+          <p id="nameDialogText"></p>
+          <input id="nameDialogInput" type="text" maxlength="80" />
+          <div class="dialog-actions">
+            <button id="nameConfirm" type="button" class="primary">确认</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="statusLogDialog" class="help-dialog status-log-dialog">
+      <div class="help-card">
+        <div class="help-head">
+          <h2>历史状态日志</h2>
+          <div class="dialog-actions">
+            <button id="clearStatusLog" type="button">清空</button>
+            <button id="copyStatusLog" type="button">复制</button>
+            <button id="closeStatusLog" type="button">关闭</button>
+          </div>
+        </div>
+        <pre id="statusLogContent"></pre>
+      </div>
+    </dialog>
+    <dialog id="organizerWarningDialog" class="help-dialog name-dialog">
+      <div class="help-card">
+        <div class="help-head">
+          <h2>智能整理已回退</h2>
+          <button id="closeOrganizerWarning" type="button">保留结果</button>
+        </div>
+        <div class="help-content">
+          <p id="organizerWarningText"></p>
+          <div class="dialog-actions">
+            <button id="retryOrganizerWarning" type="button" class="primary">继续请求本地模型</button>
+            <button id="keepOrganizerWarning" type="button">保留本机整理结果</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
+    <script src="./renderer.js"></script>
+  </body>
+</html>
