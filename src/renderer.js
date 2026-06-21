@@ -31,6 +31,11 @@ const localAiBaseUrl = document.querySelector('#localAiBaseUrl');
 const localAiModel = document.querySelector('#localAiModel');
 const localAiBaseUrlPresets = document.querySelector('#localAiBaseUrlPresets');
 const localAiModelPresets = document.querySelector('#localAiModelPresets');
+const cloudAiBaseUrl = document.querySelector('#cloudAiBaseUrl');
+const cloudAiModel = document.querySelector('#cloudAiModel');
+const cloudAiApiKey = document.querySelector('#cloudAiApiKey');
+const cloudAiBaseUrlPresets = document.querySelector('#cloudAiBaseUrlPresets');
+const cloudAiModelPresets = document.querySelector('#cloudAiModelPresets');
 const openclawModel = document.querySelector('#openclawModel');
 const openclawCommand = document.querySelector('#openclawCommand');
 const chooseOpenClawCommand = document.querySelector('#chooseOpenClawCommand');
@@ -42,6 +47,10 @@ const checkLocalAi = document.querySelector('#checkLocalAi');
 const testLocalAi = document.querySelector('#testLocalAi');
 const copyLocalAiDiagnostics = document.querySelector('#copyLocalAiDiagnostics');
 const localAiStatus = document.querySelector('#localAiStatus');
+const checkCloudAi = document.querySelector('#checkCloudAi');
+const testCloudAi = document.querySelector('#testCloudAi');
+const copyCloudAiDiagnostics = document.querySelector('#copyCloudAiDiagnostics');
+const cloudAiStatus = document.querySelector('#cloudAiStatus');
 const autoTranscribe = document.querySelector('#autoTranscribe');
 const promptForNames = document.querySelector('#promptForNames');
 const rewriteMode = document.querySelector('#rewriteMode');
@@ -64,6 +73,8 @@ const keepOrganizerWarning = document.querySelector('#keepOrganizerWarning');
 
 const STATUS_LOG_KEY = 'lingchuang-status-log-v1';
 const LOCAL_AI_PRESETS_KEY = 'lingchuang-local-ai-presets-v1';
+const CLOUD_AI_PRESETS_KEY = 'lingchuang-cloud-ai-presets-v1';
+const CLOUD_AI_KEY_STORAGE = 'lingchuang-cloud-ai-api-key-v1';
 
 let mediaRecorder = null;
 let outputRoot = null;
@@ -86,6 +97,7 @@ let nativeSegments = [];
 let nativeAudioMode = 'system';
 let lastOpenClawInfo = null;
 let lastLocalAiInfo = null;
+let lastCloudAiInfo = null;
 let recordingLimitSeconds = 0;
 let autoStopTimer = null;
 let autoStopTriggered = false;
@@ -128,6 +140,9 @@ function jobOptions(extra = {}) {
     openclawCommand: openclawCommand.value.trim(),
     localAiBaseUrl: localAiBaseUrl.value.trim(),
     localAiModel: localAiModel.value.trim(),
+    cloudAiBaseUrl: cloudAiBaseUrl.value.trim(),
+    cloudAiModel: cloudAiModel.value.trim(),
+    cloudAiApiKey: cloudAiApiKey.value.trim(),
     ...extra
   };
 }
@@ -135,6 +150,7 @@ function jobOptions(extra = {}) {
 function updateOrganizerFields() {
   const openclawEnabled = organizer.value === 'openclaw';
   const localAiEnabled = organizer.value === 'localai';
+  const cloudAiEnabled = organizer.value === 'cloudai';
   openclawModel.disabled = !openclawEnabled;
   openclawCommand.disabled = !openclawEnabled;
   chooseOpenClawCommand.disabled = !openclawEnabled;
@@ -149,6 +165,14 @@ function updateOrganizerFields() {
   checkLocalAi.disabled = !localAiEnabled;
   testLocalAi.disabled = !localAiEnabled;
   copyLocalAiDiagnostics.disabled = !localAiEnabled;
+
+  cloudAiBaseUrl.disabled = !cloudAiEnabled;
+  cloudAiModel.disabled = !cloudAiEnabled;
+  cloudAiApiKey.disabled = !cloudAiEnabled;
+  document.querySelectorAll('.cloudai-field').forEach((item) => item.classList.toggle('disabled', !cloudAiEnabled));
+  checkCloudAi.disabled = !cloudAiEnabled;
+  testCloudAi.disabled = !cloudAiEnabled;
+  copyCloudAiDiagnostics.disabled = !cloudAiEnabled;
 }
 
 function renderOpenClawStatus(info) {
@@ -179,6 +203,19 @@ function renderLocalAiStatus(info) {
   if (!localAiModel.value.trim() && modelHint) localAiModel.value = modelHint;
 }
 
+function renderCloudAiStatus(info) {
+  lastCloudAiInfo = info;
+  const box = checkCloudAi.closest('.openclaw-status');
+  box?.classList.toggle('ready', Boolean(info.available));
+  box?.classList.toggle('error', !info.available);
+  const modelHint = info.selectedModel || info.models?.[0]?.id || '';
+  cloudAiStatus.textContent = info.available
+    ? `云端 API 已连接：${info.baseUrl}${modelHint ? `；模型：${modelHint}` : ''}`
+    : (info.message || '云端 API 不可用，将使用本机规则整理。');
+  if (!cloudAiBaseUrl.value.trim() && info.baseUrl) cloudAiBaseUrl.value = info.baseUrl;
+  if (!cloudAiModel.value.trim() && modelHint) cloudAiModel.value = modelHint;
+}
+
 function openClawOptions() {
   return {
     command: openclawCommand.value.trim(),
@@ -190,6 +227,14 @@ function localAiOptions() {
   return {
     baseUrl: localAiBaseUrl.value.trim(),
     model: localAiModel.value.trim()
+  };
+}
+
+function cloudAiOptions() {
+  return {
+    baseUrl: cloudAiBaseUrl.value.trim(),
+    model: cloudAiModel.value.trim(),
+    apiKey: cloudAiApiKey.value.trim()
   };
 }
 
@@ -229,6 +274,46 @@ function rememberCurrentLocalAiPreset() {
   saveLocalAiPreset(localAiBaseUrl.value.trim() || 'http://127.0.0.1:11434', localAiModel.value.trim());
 }
 
+function loadCloudAiPresets() {
+  try {
+    const value = JSON.parse(localStorage.getItem(CLOUD_AI_PRESETS_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCloudAiPreset(baseUrl, model) {
+  const normalizedBaseUrl = String(baseUrl || '').trim();
+  const normalizedModel = String(model || '').trim();
+  if (!normalizedBaseUrl && !normalizedModel) return;
+  const presets = loadCloudAiPresets().filter((item) => (
+    item.baseUrl !== normalizedBaseUrl || item.model !== normalizedModel
+  ));
+  presets.unshift({ baseUrl: normalizedBaseUrl, model: normalizedModel, updatedAt: Date.now() });
+  localStorage.setItem(CLOUD_AI_PRESETS_KEY, JSON.stringify(presets.slice(0, 30)));
+  renderCloudAiPresets();
+}
+
+function renderCloudAiPresets() {
+  const presets = loadCloudAiPresets();
+  const baseUrls = [...new Set(presets.map((item) => item.baseUrl).filter(Boolean))];
+  const models = [...new Set(presets.map((item) => item.model).filter(Boolean))];
+  cloudAiBaseUrlPresets.innerHTML = baseUrls.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  cloudAiModelPresets.innerHTML = models.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  if (!cloudAiBaseUrl.value.trim() && baseUrls[0]) cloudAiBaseUrl.value = baseUrls[0];
+  if (!cloudAiModel.value.trim() && models[0]) cloudAiModel.value = models[0];
+  if (!cloudAiApiKey.value.trim()) cloudAiApiKey.value = localStorage.getItem(CLOUD_AI_KEY_STORAGE) || '';
+}
+
+function rememberCurrentCloudAiPreset() {
+  if (organizer.value !== 'cloudai') return;
+  saveCloudAiPreset(cloudAiBaseUrl.value.trim(), cloudAiModel.value.trim());
+  if (cloudAiApiKey.value.trim()) {
+    localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+  }
+}
+
 function buildDiagnosticsText() {
   const info = lastOpenClawInfo || {};
   return [
@@ -257,6 +342,19 @@ function buildLocalAiDiagnosticsText() {
     `本地模型名称：${localAiModel.value.trim() || info.selectedModel || '未填写'}`,
     `检测到的模型：${(info.models || []).map((item) => item.id).join(', ') || '未检测'}`,
     `状态：${info.message || localAiStatus.textContent || '未检测'}`
+  ].join('\n');
+}
+
+function buildCloudAiDiagnosticsText() {
+  const info = lastCloudAiInfo || {};
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `智能整理：${organizer.value}`,
+    `云端 API 地址：${cloudAiBaseUrl.value.trim() || info.baseUrl || '未填写'}`,
+    `云端模型名称：${cloudAiModel.value.trim() || info.selectedModel || '未填写'}`,
+    `API Key：${cloudAiApiKey.value.trim() ? '已填写' : '未填写'}`,
+    `检测到的模型：${(info.models || []).map((item) => item.id).join(', ') || '未检测'}`,
+    `状态：${info.message || cloudAiStatus.textContent || '未检测'}`
   ].join('\n');
 }
 
@@ -339,6 +437,49 @@ async function testLocalAiStatus() {
     logStatus(`本地大模型测试失败：${error.message || String(error)}`);
   } finally {
     testLocalAi.disabled = organizer.value !== 'localai';
+  }
+}
+
+async function checkCloudAiStatus() {
+  checkCloudAi.disabled = true;
+  cloudAiStatus.textContent = '检测中...';
+  try {
+    const info = await window.studio.checkCloudAi(cloudAiOptions());
+    renderCloudAiStatus(info);
+    if (info.available) {
+      logStatus(`云端 API 已连接：${info.baseUrl}`);
+      if (info.selectedModel) logStatus(`当前云端模型：${info.selectedModel}`);
+      saveCloudAiPreset(info.baseUrl || cloudAiBaseUrl.value.trim(), info.selectedModel || cloudAiModel.value.trim());
+      if (cloudAiApiKey.value.trim()) localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+    } else {
+      logStatus(info.message || '云端 API 不可用；增强整理会自动回退本机规则整理。');
+    }
+  } catch (error) {
+    renderCloudAiStatus({ available: false, message: error.message || String(error) });
+    logStatus(`云端 API 检测失败：${error.message || String(error)}`);
+  } finally {
+    checkCloudAi.disabled = organizer.value !== 'cloudai';
+  }
+}
+
+async function testCloudAiStatus() {
+  testCloudAi.disabled = true;
+  cloudAiStatus.textContent = '正在测试模型...';
+  try {
+    const result = await window.studio.testCloudAi(cloudAiOptions());
+    logStatus(`云端大模型测试成功：${result.model}`);
+    cloudAiStatus.textContent = `模型测试成功：${result.model}`;
+    saveCloudAiPreset(result.baseUrl || cloudAiBaseUrl.value.trim(), result.model || cloudAiModel.value.trim());
+    if (cloudAiApiKey.value.trim()) localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+    checkCloudAi.closest('.openclaw-status')?.classList.add('ready');
+    checkCloudAi.closest('.openclaw-status')?.classList.remove('error');
+  } catch (error) {
+    cloudAiStatus.textContent = `模型测试失败：${error.message || String(error)}`;
+    checkCloudAi.closest('.openclaw-status')?.classList.add('error');
+    checkCloudAi.closest('.openclaw-status')?.classList.remove('ready');
+    logStatus(`云端大模型测试失败：${error.message || String(error)}`);
+  } finally {
+    testCloudAi.disabled = organizer.value !== 'cloudai';
   }
 }
 
@@ -766,6 +907,7 @@ async function runTranscription(row) {
   if (startButton) startButton.hidden = true;
   if (stopButton) stopButton.hidden = false;
   rememberCurrentLocalAiPreset();
+  rememberCurrentCloudAiPreset();
   try {
     const result = await window.studio.transcribeMedia({
       filePath,
@@ -1407,6 +1549,12 @@ copyLocalAiDiagnostics.addEventListener('click', async () => {
   await window.studio.copyText(buildLocalAiDiagnosticsText());
   logStatus('本地大模型诊断信息已复制。');
 });
+checkCloudAi.addEventListener('click', checkCloudAiStatus);
+testCloudAi.addEventListener('click', testCloudAiStatus);
+copyCloudAiDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildCloudAiDiagnosticsText());
+  logStatus('云端大模型诊断信息已复制。');
+});
 captureMode.addEventListener('change', async () => {
   if (!recordingBackend) {
     framePrepared = false;
@@ -1417,6 +1565,7 @@ captureMode.addEventListener('change', async () => {
 });
 updateOrganizerFields();
 renderLocalAiPresets();
+renderCloudAiPresets();
 
 window.studio.onJobLog((payload) => {
   if (payload.message) logStatus(payload.message);
@@ -1492,10 +1641,11 @@ window.studio.appInfo().then((info) => {
     `转写脚本：${info.pythonScript}`,
     `可选 OpenClaw：${info.openclaw}`,
     '可选本地大模型直连：默认检测 Ollama http://127.0.0.1:11434，也支持兼容 /v1/chat/completions 的本地服务。',
+    '可选云端大模型 API：支持 OpenAI 兼容接口，API Key 只保存在本机，不写入转写文档。',
     '重复内容去重默认使用普通模式，可处理在线播放卡顿、回放、跳回开头造成的重复片段。',
     '录屏优先使用 macOS 原生录制。',
     '系统声音不拾取外部环境；外部声音使用麦克风。',
-    '默认独立运行；选择 OpenClaw 或本地大模型直连时才会调用额外模型。',
+    '默认独立运行；选择 OpenClaw、本地大模型或云端大模型 API 时才会调用额外模型。',
     'OpenClaw 模型留空会使用 OpenClaw 默认模型；本地直连必须填写模型名称。',
     '换电脑时如检测不到，可复制诊断信息，也可改用本地大模型直连。'
   ].join('\n');

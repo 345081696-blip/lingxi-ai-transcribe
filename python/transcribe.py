@@ -569,6 +569,58 @@ def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_mo
     raise RuntimeError("本地大模型连续 3 次未返回有效整理内容；" + "；".join(errors))
 
 
+def chat_completion_endpoint(base_url):
+    value = (base_url or "").rstrip("/")
+    if not value:
+        return ""
+    if value.endswith("/v1"):
+        return f"{value}/chat/completions"
+    return f"{value}/v1/chat/completions"
+
+
+def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None):
+    api_key = os.environ.get("TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY", "").strip()
+    if not cloud_ai_base_url:
+        raise RuntimeError("云端 API 地址为空。")
+    if not cloud_ai_model:
+        raise RuntimeError("云端模型名称为空。")
+    if not api_key:
+        raise RuntimeError("云端 API Key 为空。")
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report)
+    endpoint = chat_completion_endpoint(cloud_ai_base_url)
+    payload = {
+        "model": cloud_ai_model,
+        "messages": [
+            {"role": "system", "content": "你是严谨的中文转写文档整理助手，只输出最终整理稿。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "stream": False
+    }
+    emit(f"[智能整理] 正在调用云端大模型 API 整理（模型：{cloud_ai_model}）...")
+    emit_progress("organize", 86, f"正在调用云端大模型整理：{cloud_ai_model}")
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            data = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace") if error.fp else ""
+        raise RuntimeError(f"云端大模型请求失败：HTTP {error.code} {detail[:800]}") from error
+    payload = json.loads(data or "{}")
+    text = to_simplified(extract_text(payload)).strip()
+    if not text:
+        raise RuntimeError("云端大模型没有返回有效整理内容。")
+    return text
+
+
 def parse_openclaw_output(stdout):
     stripped = stdout.strip()
     if not stripped:
@@ -609,7 +661,7 @@ def extract_text(value):
     return ""
 
 
-def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", subtitle_reference="", dedupe_report=None):
+def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None):
     report = {
         "organizer_requested": organizer,
         "organizer_actual": "local",
@@ -618,9 +670,11 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
         "openclaw_model": openclaw_model if organizer == "openclaw" else "",
         "local_ai_base_url": local_ai_base_url if organizer == "localai" else "",
         "local_ai_model": local_ai_model if organizer == "localai" else "",
+        "cloud_ai_base_url": cloud_ai_base_url if organizer == "cloudai" else "",
+        "cloud_ai_model": cloud_ai_model if organizer == "cloudai" else "",
         "failure_reason": "",
     }
-    if organizer not in ("openclaw", "localai"):
+    if organizer not in ("openclaw", "localai", "cloudai"):
         emit_progress("organize", 88, "正在进行本机智能整理...")
         return body, "local", report
     if organizer == "openclaw":
@@ -635,6 +689,18 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
             report["organizer_actual"] = "local-fallback"
             report["failure_reason"] = str(error)
             return body, "local-fallback", report
+    if organizer == "cloudai":
+        try:
+            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report)
+            emit_progress("organize", 92, "云端大模型增强整理完成。")
+            report["organizer_actual"] = "cloudai"
+            return enhanced, "cloudai", report
+        except Exception as error:
+            emit(f"云端大模型增强整理不可用，已保留本机整理结果：{error}")
+            emit_progress("organize", 90, "云端大模型不可用，已回退本机整理。")
+            report["organizer_actual"] = "cloudai-fallback"
+            report["failure_reason"] = str(error)
+            return body, "cloudai-fallback", report
     try:
         enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report)
         emit_progress("organize", 92, "本地大模型增强整理完成。")
@@ -653,8 +719,10 @@ def report_label(value):
         "local": "本机规则整理",
         "openclaw": "OpenClaw/Qwen 增强整理",
         "localai": "本地大模型直连",
+        "cloudai": "云端大模型 API",
         "local-fallback": "OpenClaw 失败后回退本机规则整理",
         "localai-fallback": "本地大模型失败后回退本机规则整理",
+        "cloudai-fallback": "云端大模型失败后回退本机规则整理",
     }
     return labels.get(value, value or "未记录")
 
@@ -674,6 +742,10 @@ def build_processing_report_lines(language, style, organizer_report, dedupe_repo
         lines.append(f"OpenClaw 命令：{organizer_report.get('openclaw_bin')}")
     if organizer_report.get("openclaw_model"):
         lines.append(f"OpenClaw 模型：{organizer_report.get('openclaw_model')}")
+    if organizer_report.get("cloud_ai_base_url"):
+        lines.append(f"云端 API 地址：{organizer_report.get('cloud_ai_base_url')}")
+    if organizer_report.get("cloud_ai_model"):
+        lines.append(f"云端模型名称：{organizer_report.get('cloud_ai_model')}")
     if organizer_report.get("failure_reason"):
         lines.append(f"失败原因：{organizer_report.get('failure_reason')}")
     else:
@@ -684,7 +756,7 @@ def build_processing_report_lines(language, style, organizer_report, dedupe_repo
     return [to_simplified(line) for line in lines]
 
 
-def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", subtitles=None, dedupe_report=None):
+def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None):
     emit_progress("document", 90, "正在生成转写文档...")
     title = to_simplified(source_path.stem)
     cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
@@ -697,7 +769,7 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
         for item in (subtitles or [])
     )
     body = to_simplified(build_document(cleaned, style))
-    if subtitle_reference and organizer not in ("openclaw", "localai"):
+    if subtitle_reference and organizer not in ("openclaw", "localai", "cloudai"):
         body = f"{body}\n\n## 字幕参考校正\n\n{subtitle_reference}".strip()
     body, organizer_used, organizer_report = organize_body(
         body,
@@ -708,6 +780,8 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
         openclaw_model,
         local_ai_base_url,
         local_ai_model,
+        cloud_ai_base_url,
+        cloud_ai_model,
         subtitle_reference,
         dedupe_report
     )
@@ -781,11 +855,13 @@ def main():
     parser.add_argument("--language", default="zh")
     parser.add_argument("--model", default="small")
     parser.add_argument("--style", default="clean")
-    parser.add_argument("--organizer", default="local", choices=["local", "openclaw", "localai"])
+    parser.add_argument("--organizer", default="local", choices=["local", "openclaw", "localai", "cloudai"])
     parser.add_argument("--openclaw-bin", default="openclaw")
     parser.add_argument("--openclaw-model", default="")
     parser.add_argument("--local-ai-base-url", default="")
     parser.add_argument("--local-ai-model", default="")
+    parser.add_argument("--cloud-ai-base-url", default="")
+    parser.add_argument("--cloud-ai-model", default="")
     parser.add_argument("--subtitle-mode", default="off", choices=["off", "auto"])
     parser.add_argument("--dedupe-mode", default="normal", choices=["off", "normal", "strong"])
     args = parser.parse_args()
@@ -835,6 +911,8 @@ def main():
         args.openclaw_model,
         args.local_ai_base_url,
         args.local_ai_model,
+        args.cloud_ai_base_url,
+        args.cloud_ai_model,
         subtitles,
         dedupe_report,
     )

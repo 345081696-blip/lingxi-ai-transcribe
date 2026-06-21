@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('studio', {
   testOpenClaw: (options) => ipcRenderer.invoke('test-openclaw', options),
   checkLocalAi: (options) => ipcRenderer.invoke('check-local-ai', options),
   testLocalAi: (options) => ipcRenderer.invoke('test-local-ai', options),
+  checkCloudAi: (options) => ipcRenderer.invoke('check-cloud-ai', options),
+  testCloudAi: (options) => ipcRenderer.invoke('test-cloud-ai', options),
   copyText: (text) => ipcRenderer.invoke('copy-text', text),
   showRecordingWidget: () => ipcRenderer.invoke('show-recording-widget'),
   hideRecordingWidget: () => ipcRenderer.invoke('hide-recording-widget'),

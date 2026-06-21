@@ -473,9 +473,9 @@ function runCommandWithTimeout(command, args, timeoutMs = 5000) {
   });
 }
 
-function runTrackedCommand(id, command, args, onData) {
+function runTrackedCommand(id, command, args, onData, extraEnv = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { env: commandEnv() });
+    const child = spawn(command, args, { env: { ...commandEnv(), ...extraEnv } });
     activeTranscriptions.set(id, { child, stopRequested: false });
     let stdout = '';
     let stderr = '';
@@ -626,18 +626,18 @@ async function testOpenClawOrganizer(options = {}) {
   };
 }
 
-async function requestJson(url, payload = null, timeoutMs = 10000) {
+async function requestJson(url, payload = null, timeoutMs = 10000, extraHeaders = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const init = payload
       ? {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...extraHeaders },
           body: JSON.stringify(payload),
           signal: controller.signal
         }
-      : { signal: controller.signal };
+      : { signal: controller.signal, headers: extraHeaders };
     const response = await fetch(url, init);
     const text = await response.text();
     let parsed = {};
@@ -658,6 +658,10 @@ async function requestJson(url, payload = null, timeoutMs = 10000) {
 function normalizeLocalAiBaseUrl(input = '') {
   const value = String(input || '').trim();
   return value || 'http://127.0.0.1:11434';
+}
+
+function normalizeCloudAiBaseUrl(input = '') {
+  return String(input || '').trim().replace(/\/$/, '');
 }
 
 async function checkLocalAiStatus(options = {}) {
@@ -711,6 +715,70 @@ async function testLocalAiOrganizer(options = {}) {
   };
 }
 
+async function checkCloudAiStatus(options = {}) {
+  const baseUrl = normalizeCloudAiBaseUrl(options.baseUrl);
+  const apiKey = String(options.apiKey || '').trim();
+  const status = {
+    available: false,
+    baseUrl,
+    models: [],
+    selectedModel: String(options.model || '').trim(),
+    message: ''
+  };
+  if (!baseUrl) {
+    status.message = '请填写云端 API 地址。';
+    return status;
+  }
+  if (!apiKey) {
+    status.message = '请填写 API Key。';
+    return status;
+  }
+  try {
+    const modelsUrl = `${baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`}/models`;
+    const payload = await requestJson(modelsUrl, null, 15000, { Authorization: `Bearer ${apiKey}` });
+    status.models = Array.isArray(payload.data)
+      ? payload.data.map((item) => ({
+          id: item.id || item.name || '',
+          name: item.name || item.id || ''
+        })).filter((item) => item.id)
+      : [];
+    status.available = status.models.length > 0 || Boolean(status.selectedModel);
+    if (!status.selectedModel && status.models[0]) status.selectedModel = status.models[0].id;
+    status.message = status.available
+      ? `云端 API 可用；检测到 ${status.models.length} 个模型。`
+      : '云端 API 可访问，但没有返回模型列表。可直接填写服务商提供的模型名称后测试。';
+  } catch (error) {
+    status.message = `云端 API 检测失败：${error.message || String(error)}`;
+  }
+  return status;
+}
+
+async function testCloudAiOrganizer(options = {}) {
+  const baseUrl = normalizeCloudAiBaseUrl(options.baseUrl);
+  const apiKey = String(options.apiKey || '').trim();
+  const model = String(options.model || '').trim();
+  if (!baseUrl) throw new Error('请先填写云端 API 地址。');
+  if (!apiKey) throw new Error('请先填写 API Key。');
+  if (!model) throw new Error('请先填写云端模型名称。');
+  const endpointBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+  const endpoint = `${endpointBase}/chat/completions`;
+  const payload = await requestJson(endpoint, {
+    model,
+    messages: [
+      { role: 'system', content: '你是简洁的中文助手。' },
+      { role: 'user', content: '请只回复：零创AI 智能转写器云端模型测试成功' }
+    ],
+    temperature: 0.2,
+    stream: false
+  }, 60000, { Authorization: `Bearer ${apiKey}` });
+  return {
+    ok: true,
+    baseUrl,
+    model,
+    output: JSON.stringify(payload).slice(0, 1200)
+  };
+}
+
 function organizerArgs(options = {}) {
   const mode = options.organizer || 'local';
   const args = ['--organizer', mode];
@@ -720,6 +788,9 @@ function organizerArgs(options = {}) {
   } else if (mode === 'localai') {
     args.push('--local-ai-base-url', options.localAiBaseUrl || 'http://127.0.0.1:11434');
     if (options.localAiModel) args.push('--local-ai-model', options.localAiModel);
+  } else if (mode === 'cloudai') {
+    if (options.cloudAiBaseUrl) args.push('--cloud-ai-base-url', options.cloudAiBaseUrl);
+    if (options.cloudAiModel) args.push('--cloud-ai-model', options.cloudAiModel);
   }
   return args;
 }
@@ -1090,7 +1161,9 @@ ipcMain.handle('transcribe-media', async (event, options) => {
     for (const line of lines.map((item) => item.trim()).filter(Boolean)) {
       handleProgressLine(line);
     }
-  });
+  }, options.organizer === 'cloudai' && options.cloudAiApiKey
+    ? { TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY: String(options.cloudAiApiKey) }
+    : {});
   handleProgressLine(pendingLogLine.trim());
 
   const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
@@ -1151,6 +1224,10 @@ ipcMain.handle('test-openclaw', async (_event, options = {}) => testOpenClawOrga
 ipcMain.handle('check-local-ai', async (_event, options = {}) => checkLocalAiStatus(options));
 
 ipcMain.handle('test-local-ai', async (_event, options = {}) => testLocalAiOrganizer(options));
+
+ipcMain.handle('check-cloud-ai', async (_event, options = {}) => checkCloudAiStatus(options));
+
+ipcMain.handle('test-cloud-ai', async (_event, options = {}) => testCloudAiOrganizer(options));
 
 ipcMain.handle('copy-text', async (_event, text = '') => {
   clipboard.writeText(String(text || ''));

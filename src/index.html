@@ -63,8 +63,31 @@
               <option value="local">本机规则整理</option>
               <option value="openclaw">OpenClaw/Qwen 增强整理</option>
               <option value="localai">本地大模型直连</option>
+              <option value="cloudai">云端大模型 API</option>
             </select>
           </label>
+          <label class="cloudai-field">
+            <span>云端 API 地址</span>
+            <input id="cloudAiBaseUrl" list="cloudAiBaseUrlPresets" placeholder="例如 https://api.deepseek.com" />
+            <datalist id="cloudAiBaseUrlPresets"></datalist>
+          </label>
+          <label class="cloudai-field">
+            <span>云端模型名称</span>
+            <input id="cloudAiModel" list="cloudAiModelPresets" placeholder="例如 deepseek-chat、qwen-plus、gpt-4.1-mini" />
+            <datalist id="cloudAiModelPresets"></datalist>
+          </label>
+          <label class="cloudai-field">
+            <span>API Key</span>
+            <input id="cloudAiApiKey" type="password" placeholder="只保存在本机，不写入日志和文档" />
+          </label>
+          <div class="openclaw-status cloudai-field">
+            <div class="status-actions">
+              <button id="checkCloudAi" type="button">检测</button>
+              <button id="testCloudAi" type="button">测试模型</button>
+              <button id="copyCloudAiDiagnostics" type="button">复制诊断</button>
+            </div>
+            <span id="cloudAiStatus">未检测</span>
+          </div>
           <label class="localai-field">
             <span>本地模型地址</span>
             <input id="localAiBaseUrl" list="localAiBaseUrlPresets" placeholder="默认 http://127.0.0.1:11434" />
@@ -162,7 +185,7 @@
         </div>
         <div class="notice">
           <strong>两段式流程</strong>
-          <p>Whisper 负责识别语音；智能整理可独立本机运行，也可手动接入 OpenClaw 或直连本地大模型。</p>
+          <p>Whisper 负责识别语音；智能整理可独立本机运行，也可手动接入 OpenClaw、本地大模型或云端大模型 API。</p>
         </div>
         <div class="notice legal">
           <strong>版权</strong>
@@ -198,7 +221,7 @@
           <pre id="status">正在检查本机环境...</pre>
         </section>
       </section>
-      <div id="version" class="version">v0.2.21</div>
+      <div id="version" class="version">v0.2.22</div>
     </main>
     <dialog id="helpDialog" class="help-dialog">
       <div class="help-card">
@@ -223,7 +246,9 @@
           <h3>语言与模型</h3>
           <p>识别语言默认自动判断。base 更快，small 平衡速度和准确率，medium 更准但更慢；倍速较高或内容重要时，建议优先使用 small 或 medium。</p>
           <h3>智能整理</h3>
-          <p>智能整理有三种模式。本机规则整理不需要额外模型，任何电脑都能用。OpenClaw/Qwen 增强整理需要安装 OpenClaw，模型栏填写 OpenClaw 可识别的模型 ID，例如 ollama/qwen3.5:35b-a3b-coding-nvfp4，命令栏可留空自动检测或手动选择 openclaw 命令文件。</p>
+          <p>智能整理有四种模式。本机规则整理不需要额外模型，任何电脑都能用。云端大模型 API 适合长内容整理，填写兼容 OpenAI 的 API 地址、模型名称和 API Key 后点击测试模型，成功后再转写。</p>
+          <p>常见云端 API 地址示例：DeepSeek 可填 https://api.deepseek.com，OpenAI 可填 https://api.openai.com，通义千问、硅基流动、Moonshot、火山等填各自兼容 OpenAI 的 base URL。API Key 只保存在本机浏览器存储中，转写时通过进程环境变量传入，不写入日志、Markdown、TXT 或 DOCX。</p>
+          <p>OpenClaw/Qwen 增强整理需要安装 OpenClaw，模型栏填写 OpenClaw 可识别的模型 ID，例如 ollama/qwen3.5:35b-a3b-coding-nvfp4，命令栏可留空自动检测或手动选择 openclaw 命令文件。</p>
           <p>本地大模型直连不经过 OpenClaw，适合只安装了 Ollama、LM Studio 或 llama.cpp server 的电脑。Ollama 默认地址是 http://127.0.0.1:11434；模型名称不是文件路径，而是 ollama list 或 /v1/models 里看到的模型 ID，例如 qwen3.5:35b-a3b-coding-nvfp4。点击“检测”会读取 /v1/models，点击“测试模型”会发送一句短测试；成功后地址和模型名称会保存在下拉选择里。</p>
           <p>如果换电脑使用，先确认本地模型服务已启动，再复制模型名称到对应输入框。检测或测试失败时，软件会在转写时自动回退到本机规则整理，不会中断文档生成；处理报告会写明实际使用状态和失败原因。</p>
           <h3>任务与输出</h3>
