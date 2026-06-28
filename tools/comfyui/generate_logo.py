@@ -9,7 +9,7 @@ from pathlib import Path
 
 DEFAULT_PROMPT = (
     "A premium macOS app icon for a Chinese AI transcription product named "
-    "'Lingchuang AI Smart Transcribe'. Dark graphite rounded-square background, "
+    "'Zero Create AI Smart Transcribe'. Dark graphite rounded-square background, "
     "bright cyan and electric blue accents, elegant audio waveform transforming "
     "into a clean document page, subtle AI neural glow, minimal professional "
     "software icon, high contrast, centered composition, no text, no letters, "
@@ -72,7 +72,7 @@ def build_workflow(prompt, negative, checkpoint, width, height, steps, seed):
         },
         "9": {
             "class_type": "SaveImage",
-            "inputs": {"filename_prefix": "lingchuang_logo", "images": ["8", 0]},
+            "inputs": {"filename_prefix": "zero_create_logo", "images": ["8", 0]},
         },
     }
 
