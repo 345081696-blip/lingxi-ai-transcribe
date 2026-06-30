@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('studio', {
   appendRecordingChunk: (payload) => ipcRenderer.invoke('append-recording-chunk', payload),
   finishRecordingFile: (payload) => ipcRenderer.invoke('finish-recording-file', payload),
   transcribeMedia: (options) => ipcRenderer.invoke('transcribe-media', options),
+  regenerateTemplate: (options) => ipcRenderer.invoke('regenerate-template', options),
   stopTranscription: (jobId) => ipcRenderer.invoke('stop-transcription', jobId),
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
   showInFolder: (targetPath) => ipcRenderer.invoke('show-in-folder', targetPath),

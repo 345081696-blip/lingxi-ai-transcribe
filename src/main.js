@@ -655,6 +655,29 @@ async function requestJson(url, payload = null, timeoutMs = 10000, extraHeaders 
   }
 }
 
+function friendlyAiError(error) {
+  const text = error?.message || String(error || '');
+  if (/model_not_found|No available channel|model .*not found|模型不存在/i.test(text)) {
+    return '连接成功，但模型名称不可用。请到服务商后台复制可用模型 ID，或换一个模型后再试。';
+  }
+  if (/401|unauthorized|invalid api key|invalid_token|api key/i.test(text)) {
+    return 'API Key 无效、已过期或没有正确填写。请重新复制服务商后台的 Key。';
+  }
+  if (/403|forbidden|permission|无权限/i.test(text)) {
+    return 'API Key 没有权限访问该模型，或账号未开通该模型。';
+  }
+  if (/429|rate limit|quota|余额|额度/i.test(text)) {
+    return '额度不足或请求过于频繁。请检查余额、套餐或稍后再试。';
+  }
+  if (/503|502|504|No available channel|service unavailable/i.test(text)) {
+    return '服务商当前没有可用通道。请换模型、换线路或稍后再试。';
+  }
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|timed out|timeout|AbortError|fetch failed/i.test(text)) {
+    return '网络或 API 地址不可用。请检查 Base URL 是否正确，或确认当前网络能访问该服务。';
+  }
+  return text;
+}
+
 function normalizeLocalAiBaseUrl(input = '') {
   const value = String(input || '').trim();
   return value || 'http://127.0.0.1:11434';
@@ -688,7 +711,7 @@ async function checkLocalAiStatus(options = {}) {
       ? `本地大模型服务可用；检测到 ${status.models.length} 个模型。`
       : '本地大模型服务可访问，但没有返回模型列表。';
   } catch (error) {
-    status.message = `未检测到本地大模型服务：${error.message || String(error)}`;
+    status.message = `未检测到本地大模型服务：${friendlyAiError(error)}`;
   }
   return status;
 }
@@ -698,15 +721,20 @@ async function testLocalAiOrganizer(options = {}) {
   const model = String(options.model || '').trim();
   if (!model) throw new Error('请先填写本地模型名称，或点击检测后复制模型名。');
   const endpoint = `${baseUrl.replace(/\/$/, '')}/v1/chat/completions`;
-  const payload = await requestJson(endpoint, {
-    model,
-    messages: [
-      { role: 'system', content: '你是简洁的中文助手。' },
-      { role: 'user', content: '请只回复：零创AI 智能转写器测试成功' }
-    ],
-    temperature: 0.2,
-    stream: false
-  }, 60000);
+  let payload;
+  try {
+    payload = await requestJson(endpoint, {
+      model,
+      messages: [
+        { role: 'system', content: '你是简洁的中文助手。' },
+        { role: 'user', content: '请只回复：零创AI 智能转写器测试成功' }
+      ],
+      temperature: 0.2,
+      stream: false
+    }, 60000);
+  } catch (error) {
+    throw new Error(friendlyAiError(error));
+  }
   return {
     ok: true,
     baseUrl,
@@ -748,7 +776,7 @@ async function checkCloudAiStatus(options = {}) {
       ? `云端 API 可用；检测到 ${status.models.length} 个模型。`
       : '云端 API 可访问，但没有返回模型列表。可直接填写服务商提供的模型名称后测试。';
   } catch (error) {
-    status.message = `云端 API 检测失败：${error.message || String(error)}`;
+    status.message = `云端 API 检测失败：${friendlyAiError(error)}`;
   }
   return status;
 }
@@ -762,15 +790,20 @@ async function testCloudAiOrganizer(options = {}) {
   if (!model) throw new Error('请先填写云端模型名称。');
   const endpointBase = baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
   const endpoint = `${endpointBase}/chat/completions`;
-  const payload = await requestJson(endpoint, {
-    model,
-    messages: [
-      { role: 'system', content: '你是简洁的中文助手。' },
-      { role: 'user', content: '请只回复：零创AI 智能转写器云端模型测试成功' }
-    ],
-    temperature: 0.2,
-    stream: false
-  }, 60000, { Authorization: `Bearer ${apiKey}` });
+  let payload;
+  try {
+    payload = await requestJson(endpoint, {
+      model,
+      messages: [
+        { role: 'system', content: '你是简洁的中文助手。' },
+        { role: 'user', content: '请只回复：零创AI 智能转写器云端模型测试成功' }
+      ],
+      temperature: 0.2,
+      stream: false
+    }, 60000, { Authorization: `Bearer ${apiKey}` });
+  } catch (error) {
+    throw new Error(friendlyAiError(error));
+  }
   return {
     ok: true,
     baseUrl,
@@ -792,6 +825,7 @@ function organizerArgs(options = {}) {
     if (options.cloudAiBaseUrl) args.push('--cloud-ai-base-url', options.cloudAiBaseUrl);
     if (options.cloudAiModel) args.push('--cloud-ai-model', options.cloudAiModel);
   }
+  if (options.documentTemplate) args.push('--document-template', options.documentTemplate);
   return args;
 }
 
@@ -1175,6 +1209,59 @@ ipcMain.handle('transcribe-media', async (event, options) => {
     throw new Error(`转写脚本没有返回有效结果：${lastLine}`);
   }
   return parsed;
+});
+
+ipcMain.handle('regenerate-template', async (event, options = {}) => {
+  const segmentsPath = options.segmentsPath;
+  if (!segmentsPath || !fs.existsSync(segmentsPath)) {
+    throw new Error('找不到可复用的逐字稿 segments.json。');
+  }
+  const sourceName = safeName(options.sourceName || options.sourcePath || segmentsPath);
+  const jobDir = path.join(outputRoot, `${new Date().toISOString().replace(/[:.]/g, '-')}-${sourceName}-模板再生成`);
+  fs.mkdirSync(jobDir, { recursive: true });
+  const jobId = options.jobId || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const args = [
+    pythonScript,
+    '--input', options.sourcePath && fs.existsSync(options.sourcePath) ? options.sourcePath : segmentsPath,
+    '--segments-json', segmentsPath,
+    '--output-dir', jobDir,
+    '--language', options.language || 'zh',
+    '--style', options.style || 'clean',
+    '--subtitle-mode', 'off',
+    '--dedupe-mode', 'off',
+    ...organizerArgs(options)
+  ];
+  const handleProgressLine = (line) => {
+    if (!line) return;
+    if (line.startsWith(progressPrefix)) {
+      try {
+        const progress = JSON.parse(line.slice(progressPrefix.length));
+        sendToWebContents(event.sender, 'job-progress', { jobId, filePath: segmentsPath, ...progress });
+      } catch {
+        sendToWebContents(event.sender, 'job-log', { jobId, filePath: segmentsPath, message: line });
+      }
+    } else {
+      sendToWebContents(event.sender, 'job-log', { jobId, filePath: segmentsPath, message: line });
+    }
+  };
+  let pendingLogLine = '';
+  sendToWebContents(event.sender, 'job-log', { jobId, filePath: segmentsPath, message: '开始换模板生成：复用已有逐字稿，不重新识别语音。' });
+  const result = await runTrackedCommand(jobId, resolvePython(), args, (text) => {
+    pendingLogLine += text;
+    const lines = pendingLogLine.split(/\r?\n/);
+    pendingLogLine = lines.pop() || '';
+    for (const line of lines.map((item) => item.trim()).filter(Boolean)) handleProgressLine(line);
+  }, options.organizer === 'cloudai' && options.cloudAiApiKey
+    ? { TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY: String(options.cloudAiApiKey) }
+    : {});
+  handleProgressLine(pendingLogLine.trim());
+  const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
+  const lastLine = lines[lines.length - 1] || '{}';
+  try {
+    return JSON.parse(lastLine);
+  } catch {
+    throw new Error(`换模板生成没有返回有效结果：${lastLine}`);
+  }
 });
 
 ipcMain.handle('stop-transcription', async (_event, jobId) => {

@@ -16,6 +16,7 @@ const version = document.querySelector('#version');
 const language = document.querySelector('#language');
 const model = document.querySelector('#model');
 const style = document.querySelector('#style');
+const documentTemplate = document.querySelector('#documentTemplate');
 const subtitleMode = document.querySelector('#subtitleMode');
 const dedupeMode = document.querySelector('#dedupeMode');
 const audioMode = document.querySelector('#audioMode');
@@ -34,6 +35,7 @@ const localAiModelPresets = document.querySelector('#localAiModelPresets');
 const cloudAiBaseUrl = document.querySelector('#cloudAiBaseUrl');
 const cloudAiModel = document.querySelector('#cloudAiModel');
 const cloudAiApiKey = document.querySelector('#cloudAiApiKey');
+const cloudAiProvider = document.querySelector('#cloudAiProvider');
 const cloudAiBaseUrlPresets = document.querySelector('#cloudAiBaseUrlPresets');
 const cloudAiModelPresets = document.querySelector('#cloudAiModelPresets');
 const openclawModel = document.querySelector('#openclawModel');
@@ -70,11 +72,34 @@ const organizerWarningText = document.querySelector('#organizerWarningText');
 const closeOrganizerWarning = document.querySelector('#closeOrganizerWarning');
 const retryOrganizerWarning = document.querySelector('#retryOrganizerWarning');
 const keepOrganizerWarning = document.querySelector('#keepOrganizerWarning');
+const templateDialog = document.querySelector('#templateDialog');
+const templateGenerateSelect = document.querySelector('#templateGenerateSelect');
+const cancelTemplateGenerate = document.querySelector('#cancelTemplateGenerate');
+const confirmTemplateGenerate = document.querySelector('#confirmTemplateGenerate');
 
 const STATUS_LOG_KEY = 'lingchuang-status-log-v1';
 const LOCAL_AI_PRESETS_KEY = 'lingchuang-local-ai-presets-v1';
 const CLOUD_AI_PRESETS_KEY = 'lingchuang-cloud-ai-presets-v1';
 const CLOUD_AI_KEY_STORAGE = 'lingchuang-cloud-ai-api-key-v1';
+
+const CLOUD_AI_PROVIDER_PRESETS = {
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  deeprouter: { baseUrl: 'https://deeprouter.top', model: '' },
+  siliconflow: { baseUrl: 'https://api.siliconflow.cn', model: 'deepseek-ai/DeepSeek-V3' },
+  qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus' },
+  moonshot: { baseUrl: 'https://api.moonshot.cn', model: 'moonshot-v1-8k' },
+  volcengine: { baseUrl: 'https://ark.cn-beijing.volces.com/api', model: '' },
+  openai: { baseUrl: 'https://api.openai.com', model: 'gpt-4.1-mini' }
+};
+
+const DOCUMENT_TEMPLATE_LABELS = {
+  general: '通用整理',
+  live_recap: '直播复盘',
+  course_notes: '课程笔记',
+  material_extract: '素材提取',
+  sales_script: '成交话术',
+  quotes: '金句提取'
+};
 
 let mediaRecorder = null;
 let outputRoot = null;
@@ -133,6 +158,7 @@ function jobOptions(extra = {}) {
     language: language.value,
     model: model.value,
     style: style.value,
+    documentTemplate: documentTemplate.value,
     subtitleMode: subtitleMode.value,
     dedupeMode: dedupeMode.value,
     organizer: organizer.value,
@@ -169,6 +195,7 @@ function updateOrganizerFields() {
   cloudAiBaseUrl.disabled = !cloudAiEnabled;
   cloudAiModel.disabled = !cloudAiEnabled;
   cloudAiApiKey.disabled = !cloudAiEnabled;
+  cloudAiProvider.disabled = !cloudAiEnabled;
   document.querySelectorAll('.cloudai-field').forEach((item) => item.classList.toggle('disabled', !cloudAiEnabled));
   checkCloudAi.disabled = !cloudAiEnabled;
   testCloudAi.disabled = !cloudAiEnabled;
@@ -214,6 +241,29 @@ function renderCloudAiStatus(info) {
     : (info.message || '云端 API 不可用，将使用本机规则整理。');
   if (!cloudAiBaseUrl.value.trim() && info.baseUrl) cloudAiBaseUrl.value = info.baseUrl;
   if (!cloudAiModel.value.trim() && modelHint) cloudAiModel.value = modelHint;
+}
+
+function friendlyAiError(message) {
+  const text = String(message || '');
+  if (/model_not_found|No available channel|model .*not found|模型名称不可用|模型不存在/i.test(text)) {
+    return '连接成功，但模型名称不可用。请到服务商后台复制可用模型 ID，或换一个模型后再试。';
+  }
+  if (/401|unauthorized|invalid api key|invalid_token|API Key 无效/i.test(text)) {
+    return 'API Key 无效、已过期或没有正确填写。请重新复制服务商后台的 Key。';
+  }
+  if (/403|forbidden|无权限|没有权限/i.test(text)) {
+    return 'API Key 没有权限访问该模型，或账号未开通该模型。';
+  }
+  if (/429|rate limit|quota|额度|余额/i.test(text)) {
+    return '额度不足或请求过于频繁。请检查余额、套餐或稍后再试。';
+  }
+  if (/503|502|504|没有可用通道|服务商当前没有可用通道/i.test(text)) {
+    return '服务商当前没有可用通道。请换模型、换线路或稍后再试。';
+  }
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|timed out|timeout|网络或 API 地址不可用/i.test(text)) {
+    return '网络或 API 地址不可用。请检查 Base URL 是否正确，或确认当前网络能访问该服务。';
+  }
+  return text;
 }
 
 function openClawOptions() {
@@ -297,13 +347,23 @@ function saveCloudAiPreset(baseUrl, model) {
 
 function renderCloudAiPresets() {
   const presets = loadCloudAiPresets();
-  const baseUrls = [...new Set(presets.map((item) => item.baseUrl).filter(Boolean))];
-  const models = [...new Set(presets.map((item) => item.model).filter(Boolean))];
+  const presetBaseUrls = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.baseUrl).filter(Boolean);
+  const presetModels = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.model).filter(Boolean);
+  const baseUrls = [...new Set([...presetBaseUrls, ...presets.map((item) => item.baseUrl).filter(Boolean)])];
+  const models = [...new Set([...presetModels, ...presets.map((item) => item.model).filter(Boolean)])];
   cloudAiBaseUrlPresets.innerHTML = baseUrls.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
   cloudAiModelPresets.innerHTML = models.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
   if (!cloudAiBaseUrl.value.trim() && baseUrls[0]) cloudAiBaseUrl.value = baseUrls[0];
   if (!cloudAiModel.value.trim() && models[0]) cloudAiModel.value = models[0];
   if (!cloudAiApiKey.value.trim()) cloudAiApiKey.value = localStorage.getItem(CLOUD_AI_KEY_STORAGE) || '';
+}
+
+function applyCloudAiProviderPreset() {
+  const preset = CLOUD_AI_PROVIDER_PRESETS[cloudAiProvider.value];
+  if (!preset) return;
+  cloudAiBaseUrl.value = preset.baseUrl || cloudAiBaseUrl.value;
+  if (preset.model) cloudAiModel.value = preset.model;
+  cloudAiStatus.textContent = '已套用服务商预设，请确认模型名称和 API Key 后测试模型。';
 }
 
 function rememberCurrentCloudAiPreset() {
@@ -455,8 +515,9 @@ async function checkCloudAiStatus() {
       logStatus(info.message || '云端 API 不可用；增强整理会自动回退本机规则整理。');
     }
   } catch (error) {
-    renderCloudAiStatus({ available: false, message: error.message || String(error) });
-    logStatus(`云端 API 检测失败：${error.message || String(error)}`);
+    const message = friendlyAiError(error.message || String(error));
+    renderCloudAiStatus({ available: false, message });
+    logStatus(`云端 API 检测失败：${message}`);
   } finally {
     checkCloudAi.disabled = organizer.value !== 'cloudai';
   }
@@ -474,10 +535,11 @@ async function testCloudAiStatus() {
     checkCloudAi.closest('.openclaw-status')?.classList.add('ready');
     checkCloudAi.closest('.openclaw-status')?.classList.remove('error');
   } catch (error) {
-    cloudAiStatus.textContent = `模型测试失败：${error.message || String(error)}`;
+    const message = friendlyAiError(error.message || String(error));
+    cloudAiStatus.textContent = `模型测试失败：${message}`;
     checkCloudAi.closest('.openclaw-status')?.classList.add('error');
     checkCloudAi.closest('.openclaw-status')?.classList.remove('ready');
-    logStatus(`云端大模型测试失败：${error.message || String(error)}`);
+    logStatus(`云端大模型测试失败：${message}`);
   } finally {
     testCloudAi.disabled = organizer.value !== 'cloudai';
   }
@@ -879,6 +941,62 @@ function addResultActions(row, result) {
       else window.studio.openPath(target);
     });
     actions.append(button);
+  }
+  if (result.segments) {
+    const templateButton = document.createElement('button');
+    templateButton.textContent = '换模板生成';
+    templateButton.addEventListener('click', () => regenerateFromTemplate(row, result));
+    actions.append(templateButton);
+  }
+}
+
+async function askTemplate(defaultTemplate = 'live_recap') {
+  templateGenerateSelect.value = defaultTemplate;
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      templateDialog.removeEventListener('close', handleClose);
+      resolve(templateDialog.returnValue === 'confirm' ? templateGenerateSelect.value : '');
+    };
+    templateDialog.addEventListener('close', handleClose);
+    templateDialog.showModal();
+  });
+}
+
+async function regenerateFromTemplate(row, result) {
+  const nextTemplate = await askTemplate(documentTemplate.value || 'live_recap');
+  if (!nextTemplate) return;
+  const jobId = createJobId();
+  row.dataset.jobId = jobId;
+  row.dataset.running = 'true';
+  setJobState(row, '', '生成中');
+  updateJobProgress(row, { percent: 4, message: '正在换模板生成...' });
+  appendJobLog(row, `换模板生成：${DOCUMENT_TEMPLATE_LABELS[nextTemplate] || nextTemplate}。`);
+  rememberCurrentLocalAiPreset();
+  rememberCurrentCloudAiPreset();
+  try {
+    const regenerated = await window.studio.regenerateTemplate({
+      jobId,
+      segmentsPath: result.segments,
+      sourcePath: row.dataset.filePath,
+      sourceName: fileName(row.dataset.filePath),
+      ...jobOptions({ documentTemplate: nextTemplate, outputMode: 'keep' })
+    });
+    const renamedOutputDir = await promptForOutputFolderName(regenerated.output_dir);
+    const finalResult = updateResultPathsAfterRename(regenerated, renamedOutputDir);
+    setJobState(row, 'done', '完成');
+    updateJobProgress(row, { percent: 100, message: '换模板生成完成。' });
+    appendJobLog(row, finalResult.summary || '已生成新模板文档。');
+    if (finalResult.processing_report?.organizer_actual) {
+      appendJobLog(row, `智能整理实际使用：${finalResult.processing_report.organizer_actual}`);
+    }
+    addResultActions(row, finalResult);
+    await showOrganizerWarning(finalResult, row);
+  } catch (error) {
+    setJobState(row, 'error', '失败');
+    updateJobProgress(row, { percent: 0, message: '换模板生成失败。' });
+    appendJobLog(row, error.message || String(error));
+  } finally {
+    row.dataset.running = 'false';
   }
 }
 
@@ -1517,6 +1635,7 @@ openOutput.addEventListener('click', () => {
 });
 
 organizer.addEventListener('change', updateOrganizerFields);
+cloudAiProvider.addEventListener('change', applyCloudAiProviderPreset);
 recordingDuration.addEventListener('change', () => {
   updateRecordingButtons();
   updateReadyRecordingWidget();
@@ -1616,6 +1735,14 @@ retryOrganizerWarning.addEventListener('click', () => {
   organizerWarningDialog.close('retry');
 });
 
+cancelTemplateGenerate.addEventListener('click', () => {
+  templateDialog.close('cancel');
+});
+
+confirmTemplateGenerate.addEventListener('click', () => {
+  templateDialog.close('confirm');
+});
+
 nameCancel.addEventListener('click', () => {
   nameDialog.close('cancel');
 });
@@ -1642,6 +1769,7 @@ window.studio.appInfo().then((info) => {
     `可选 OpenClaw：${info.openclaw}`,
     '可选本地大模型直连：默认检测 Ollama http://127.0.0.1:11434，也支持兼容 /v1/chat/completions 的本地服务。',
     '可选云端大模型 API：支持 OpenAI 兼容接口，API Key 只保存在本机，不写入转写文档。',
+    '文档模板可在转写前选择，也可在转写完成后复用逐字稿换模板生成，不会重新跑 Whisper。',
     '重复内容去重默认使用普通模式，可处理在线播放卡顿、回放、跳回开头造成的重复片段。',
     '录屏优先使用 macOS 原生录制。',
     '系统声音不拾取外部环境；外部声音使用麦克风。',

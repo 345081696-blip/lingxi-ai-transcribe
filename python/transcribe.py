@@ -36,6 +36,33 @@ _OPENCC_CONVERTER = None
 SUBTITLE_REGION_FILTER = "crop=iw:ih*0.32:0:ih*0.62,scale=1280:-1,format=gray"
 PROGRESS_PREFIX = "__LC_PROGRESS__"
 
+DOCUMENT_TEMPLATES = {
+    "general": {
+        "label": "通用整理",
+        "hint": "输出一份适合阅读和存档的结构化整理稿，包含主题概述、重点内容、结论和行动建议。"
+    },
+    "live_recap": {
+        "label": "直播复盘",
+        "hint": "按“核心观点、精彩案例、观众提问、成交话术、待优化项、可复用素材”组织内容。适合知识付费讲师直播后复盘。"
+    },
+    "course_notes": {
+        "label": "课程笔记",
+        "hint": "按“知识图谱、核心概念、方法论步骤、关键案例、易错点、课后行动”组织内容。"
+    },
+    "material_extract": {
+        "label": "素材提取",
+        "hint": "按“可切片片段、爆款开头、情绪高光、金句、短视频标题、剪辑建议”组织内容。"
+    },
+    "sales_script": {
+        "label": "成交话术",
+        "hint": "按“用户痛点、信任建立、价值呈现、异议处理、成交话术、可复用表达”组织内容。"
+    },
+    "quotes": {
+        "label": "金句提取",
+        "hint": "提取有传播价值的金句，并补充适用场景和原文上下文。不要为了凑数量编造金句。"
+    },
+}
+
 
 def emit(message):
     print(message, file=sys.stderr, flush=True)
@@ -432,7 +459,11 @@ def split_sentences(text):
     return [part.strip() for part in parts if part.strip()]
 
 
-def build_document(cleaned, style):
+def template_label(document_template):
+    return DOCUMENT_TEMPLATES.get(document_template, DOCUMENT_TEMPLATES["general"])["label"]
+
+
+def build_document(cleaned, style, document_template="general"):
     full_text = "\n".join(segment["text"] for segment in cleaned).strip()
     sentences = split_sentences(full_text)
     if style == "outline":
@@ -448,15 +479,19 @@ def build_document(cleaned, style):
             if sentence not in important:
                 important.append(sentence)
         body = "\n".join(important)
+    if document_template != "general" and body:
+        label = template_label(document_template)
+        body = f"## {label}\n\n{body}"
     return body.strip() or full_text
 
 
-def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_report=None):
+def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_report=None, document_template="general"):
     style_hint = {
         "clean": "清理废话、口头禅、重复句和笑声，保留重点信息，输出适合阅读的简体中文整理稿。",
         "outline": "提炼成有层次的简体中文提纲，保留关键观点、结论和行动项。",
         "verbatim": "尽量保留原意和顺序，只修正识别错误、繁体字、废话和明显重复。"
     }.get(style, "整理成简体中文文档。")
+    template = DOCUMENT_TEMPLATES.get(document_template, DOCUMENT_TEMPLATES["general"])
     source = body or timeline
     source = source[:12000]
     subtitle_block = subtitle_reference[:6000] if subtitle_reference else "无"
@@ -474,12 +509,13 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
     要求：
     1. 全部输出简体中文。
     2. {style_hint}
-    3. 删除无意义语气词、笑声、掌声、背景音乐提示和明显废话。
-    4. 不要编造原文没有的信息。
-    5. 如果语音识别和画面字幕冲突，优先根据上下文判断；专有名词、人名、课程术语可优先参考字幕。
-    6. 如果发现在线播放卡顿、回放、跳回开头导致的重复段落，只保留一次；但对主播有意强调的重点不要过度删除。
-    7. 如果发现上下文明显断裂、缺少承接，保留可确认内容，并在末尾用一句话标注“可能存在因播放卡顿造成的内容缺失”。
-    8. 只输出最终整理稿，不要解释你的处理过程。
+    3. 文档模板：{template["label"]}。{template["hint"]}
+    4. 删除无意义语气词、笑声、掌声、背景音乐提示和明显废话。
+    5. 不要编造原文没有的信息。
+    6. 如果语音识别和画面字幕冲突，优先根据上下文判断；专有名词、人名、课程术语可优先参考字幕。
+    7. 如果发现在线播放卡顿、回放、跳回开头导致的重复段落，只保留一次；但对主播有意强调的重点不要过度删除。
+    8. 如果发现上下文明显断裂、缺少承接，保留可确认内容，并在末尾用一句话标注“可能存在因播放卡顿造成的内容缺失”。
+    9. 只输出最终整理稿，不要解释你的处理过程。
 
     重复/缺失处理参考：
     {dedupe_hint}
@@ -492,8 +528,8 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
     """).strip()
 
 
-def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference="", dedupe_report=None):
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report)
+def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference="", dedupe_report=None, document_template="general"):
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
     cmd = [
         openclaw_bin,
         "infer",
@@ -521,12 +557,12 @@ def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, 
     return text
 
 
-def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference="", dedupe_report=None):
+def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference="", dedupe_report=None, document_template="general"):
     if not local_ai_base_url:
         raise RuntimeError("本地大模型地址为空。")
     if not local_ai_model:
         raise RuntimeError("本地大模型名称为空。")
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report)
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
     base_url = local_ai_base_url.rstrip("/")
     if base_url.endswith("/v1"):
         endpoint = f"{base_url}/chat/completions"
@@ -578,7 +614,7 @@ def chat_completion_endpoint(base_url):
     return f"{value}/v1/chat/completions"
 
 
-def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None):
+def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None, document_template="general"):
     api_key = os.environ.get("TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY", "").strip()
     if not cloud_ai_base_url:
         raise RuntimeError("云端 API 地址为空。")
@@ -586,7 +622,7 @@ def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_mo
         raise RuntimeError("云端模型名称为空。")
     if not api_key:
         raise RuntimeError("云端 API Key 为空。")
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report)
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
     endpoint = chat_completion_endpoint(cloud_ai_base_url)
     payload = {
         "model": cloud_ai_model,
@@ -661,11 +697,12 @@ def extract_text(value):
     return ""
 
 
-def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None):
+def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None, document_template="general"):
     report = {
         "organizer_requested": organizer,
         "organizer_actual": "local",
         "style": style,
+        "document_template": document_template,
         "openclaw_bin": openclaw_bin if organizer == "openclaw" else "",
         "openclaw_model": openclaw_model if organizer == "openclaw" else "",
         "local_ai_base_url": local_ai_base_url if organizer == "localai" else "",
@@ -679,7 +716,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
         return body, "local", report
     if organizer == "openclaw":
         try:
-            enhanced = run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference, dedupe_report)
+            enhanced = run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference, dedupe_report, document_template)
             emit_progress("organize", 92, "OpenClaw/Qwen 增强整理完成。")
             report["organizer_actual"] = "openclaw"
             return enhanced, "openclaw", report
@@ -691,7 +728,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
             return body, "local-fallback", report
     if organizer == "cloudai":
         try:
-            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report)
+            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report, document_template)
             emit_progress("organize", 92, "云端大模型增强整理完成。")
             report["organizer_actual"] = "cloudai"
             return enhanced, "cloudai", report
@@ -702,7 +739,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
             report["failure_reason"] = str(error)
             return body, "cloudai-fallback", report
     try:
-        enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report)
+        enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report, document_template)
         emit_progress("organize", 92, "本地大模型增强整理完成。")
         report["organizer_actual"] = "localai"
         return enhanced, "localai", report
@@ -731,6 +768,7 @@ def build_processing_report_lines(language, style, organizer_report, dedupe_repo
     lines = [
         f"识别语言：{language}",
         f"整理方式：{style}",
+        f"文档模板：{template_label(organizer_report.get('document_template') or 'general')}",
         f"智能整理请求：{report_label(organizer_report.get('organizer_requested'))}",
         f"智能整理实际：{report_label(organizer_report.get('organizer_actual'))}",
     ]
@@ -756,7 +794,7 @@ def build_processing_report_lines(language, style, organizer_report, dedupe_repo
     return [to_simplified(line) for line in lines]
 
 
-def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None):
+def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None, document_template="general"):
     emit_progress("document", 90, "正在生成转写文档...")
     title = to_simplified(source_path.stem)
     cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
@@ -768,7 +806,7 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
         f"[{int(item['time'] // 60):02d}:{int(item['time'] % 60):02d}] {item['text']}"
         for item in (subtitles or [])
     )
-    body = to_simplified(build_document(cleaned, style))
+    body = to_simplified(build_document(cleaned, style, document_template))
     if subtitle_reference and organizer not in ("openclaw", "localai", "cloudai"):
         body = f"{body}\n\n## 字幕参考校正\n\n{subtitle_reference}".strip()
     body, organizer_used, organizer_report = organize_body(
@@ -783,7 +821,8 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
         cloud_ai_base_url,
         cloud_ai_model,
         subtitle_reference,
-        dedupe_report
+        dedupe_report,
+        document_template
     )
     body = to_simplified(body)
     dedupe_summary = ""
@@ -864,38 +903,53 @@ def main():
     parser.add_argument("--cloud-ai-model", default="")
     parser.add_argument("--subtitle-mode", default="off", choices=["off", "auto"])
     parser.add_argument("--dedupe-mode", default="normal", choices=["off", "normal", "strong"])
+    parser.add_argument("--document-template", default="general", choices=list(DOCUMENT_TEMPLATES.keys()))
+    parser.add_argument("--segments-json", default="")
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = find_ffmpeg()
-    ffprobe = find_ffprobe(ffmpeg)
-    duration = media_duration(ffprobe, input_path)
-    audio_path = output_dir / "audio.wav"
-    extract_audio(ffmpeg, input_path, audio_path)
-
-    engine = load_engine(args.model, args.language)
-    emit("正在进行 AI 语音识别...")
-    emit_progress("transcribe", 22, "正在进行 AI 语音识别...", current=0, total=duration if duration > 0 else None)
-    segments, detected_language = engine(audio_path, duration)
-    cleaned = clean_segments(segments, args.style)
-    cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
-    cleaned, dedupe_report = dedupe_segments(cleaned, args.dedupe_mode)
-
-    subtitles = []
-    subtitle_reference_file = output_dir / "字幕参考.txt"
-    if args.subtitle_mode == "auto":
-        try:
-            frames = extract_subtitle_frames(ffmpeg, ffprobe, input_path, output_dir)
-            subtitles = recognize_subtitles(frames, output_dir)
-            emit(f"字幕辅助识别完成：{len(subtitles)} 条参考字幕。")
-        except Exception as error:
-            subtitle_reference_file.write_text("", encoding="utf-8")
-            emit(f"字幕辅助识别不可用，已继续使用纯音频转写：{error}")
-    else:
+    if args.segments_json:
+        emit("正在复用已有逐字稿换模板生成文档...")
+        emit_progress("organize", 72, "正在复用已有逐字稿换模板生成文档...")
+        segments_path = Path(args.segments_json).expanduser().resolve()
+        cleaned = json.loads(segments_path.read_text(encoding="utf-8"))
+        cleaned = clean_segments(cleaned, args.style)
+        cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        detected_language = args.language or "zh"
+        dedupe_report = {"mode": "off", "removed": 0, "notes": ["换模板生成复用已处理逐字稿，未重新执行语音识别和去重。"]}
+        subtitles = []
+        subtitle_reference_file = output_dir / "字幕参考.txt"
         subtitle_reference_file.write_text("", encoding="utf-8")
+    else:
+        ffmpeg = find_ffmpeg()
+        ffprobe = find_ffprobe(ffmpeg)
+        duration = media_duration(ffprobe, input_path)
+        audio_path = output_dir / "audio.wav"
+        extract_audio(ffmpeg, input_path, audio_path)
+
+        engine = load_engine(args.model, args.language)
+        emit("正在进行 AI 语音识别...")
+        emit_progress("transcribe", 22, "正在进行 AI 语音识别...", current=0, total=duration if duration > 0 else None)
+        segments, detected_language = engine(audio_path, duration)
+        cleaned = clean_segments(segments, args.style)
+        cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        cleaned, dedupe_report = dedupe_segments(cleaned, args.dedupe_mode)
+
+        subtitles = []
+        subtitle_reference_file = output_dir / "字幕参考.txt"
+        if args.subtitle_mode == "auto":
+            try:
+                frames = extract_subtitle_frames(ffmpeg, ffprobe, input_path, output_dir)
+                subtitles = recognize_subtitles(frames, output_dir)
+                emit(f"字幕辅助识别完成：{len(subtitles)} 条参考字幕。")
+            except Exception as error:
+                subtitle_reference_file.write_text("", encoding="utf-8")
+                emit(f"字幕辅助识别不可用，已继续使用纯音频转写：{error}")
+        else:
+            subtitle_reference_file.write_text("", encoding="utf-8")
 
     raw_json = output_dir / "segments.json"
     raw_json.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -915,6 +969,7 @@ def main():
         args.cloud_ai_model,
         subtitles,
         dedupe_report,
+        args.document_template,
     )
     summary = body.splitlines()[0][:120] if body else "已完成转写。"
     emit_progress("done", 100, "转写完成。")
