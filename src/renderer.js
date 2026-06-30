@@ -1,6 +1,7 @@
 const pickMedia = document.querySelector('#pickMedia');
 const rewriteMedia = document.querySelector('#rewriteMedia');
 const loadSources = document.querySelector('#loadSources');
+const copyRuntimeDiagnostics = document.querySelector('#copyRuntimeDiagnostics');
 const pauseRecording = document.querySelector('#pauseRecording');
 const adjustRecordingFrame = document.querySelector('#adjustRecordingFrame');
 const resumeRecording = document.querySelector('#resumeRecording');
@@ -17,9 +18,13 @@ const language = document.querySelector('#language');
 const model = document.querySelector('#model');
 const style = document.querySelector('#style');
 const documentTemplate = document.querySelector('#documentTemplate');
+const modelHint = document.querySelector('#modelHint');
 const subtitleMode = document.querySelector('#subtitleMode');
 const dedupeMode = document.querySelector('#dedupeMode');
+const dedupeHint = document.querySelector('#dedupeHint');
 const audioMode = document.querySelector('#audioMode');
+const testAudioInput = document.querySelector('#testAudioInput');
+const audioCheckStatus = document.querySelector('#audioCheckStatus');
 const captureMode = document.querySelector('#captureMode');
 const recordingDuration = document.querySelector('#recordingDuration');
 const customDurationMinutes = document.querySelector('#customDurationMinutes');
@@ -27,6 +32,12 @@ const durationCalculator = document.querySelector('#durationCalculator');
 const sourceVideoDuration = document.querySelector('#sourceVideoDuration');
 const playbackSpeed = document.querySelector('#playbackSpeed');
 const durationHint = document.querySelector('#durationHint');
+const recordingBufferSeconds = document.querySelector('#recordingBufferSeconds');
+const glossaryText = document.querySelector('#glossaryText');
+const workflowTitle = document.querySelector('#workflowTitle');
+const workflowSummary = document.querySelector('#workflowSummary');
+const expectedFinish = document.querySelector('#expectedFinish');
+const audioSummary = document.querySelector('#audioSummary');
 const organizer = document.querySelector('#organizer');
 const localAiBaseUrl = document.querySelector('#localAiBaseUrl');
 const localAiModel = document.querySelector('#localAiModel');
@@ -81,6 +92,7 @@ const STATUS_LOG_KEY = 'lingchuang-status-log-v1';
 const LOCAL_AI_PRESETS_KEY = 'lingchuang-local-ai-presets-v1';
 const CLOUD_AI_PRESETS_KEY = 'lingchuang-cloud-ai-presets-v1';
 const CLOUD_AI_KEY_STORAGE = 'lingchuang-cloud-ai-api-key-v1';
+const GLOSSARY_STORAGE_KEY = 'lingchuang-glossary-v1';
 
 const CLOUD_AI_PROVIDER_PRESETS = {
   deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
@@ -159,6 +171,7 @@ function jobOptions(extra = {}) {
     model: model.value,
     style: style.value,
     documentTemplate: documentTemplate.value,
+    glossaryText: glossaryText.value.trim(),
     subtitleMode: subtitleMode.value,
     dedupeMode: dedupeMode.value,
     organizer: organizer.value,
@@ -418,6 +431,28 @@ function buildCloudAiDiagnosticsText() {
   ].join('\n');
 }
 
+function buildRuntimeDiagnosticsText() {
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `识别语言：${language.value}`,
+    `Whisper 模型：${model.value}`,
+    `整理方式：${style.value}`,
+    `文档模板：${DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || documentTemplate.value}`,
+    `字幕辅助：${subtitleMode.value}`,
+    `重复内容去重：${dedupeMode.value}`,
+    `录制声音：${audioModeLabel(audioMode.value)}`,
+    `录制范围：${captureMode.value === 'screen' ? '全屏录制' : '框选范围'}`,
+    `录制定时：${recordingLimitLabel(selectedRecordingLimitSeconds())}`,
+    `结束缓冲：${recordingBufferSeconds.value || 0} 秒`,
+    `智能整理：${organizer.value}`,
+    `云端 API：${cloudAiBaseUrl.value.trim() || '未填写'} / ${cloudAiModel.value.trim() || '未填写'}`,
+    `本地模型：${localAiBaseUrl.value.trim() || '未填写'} / ${localAiModel.value.trim() || '未填写'}`,
+    `OpenClaw：${openclawCommand.value.trim() || '自动检测'} / ${openclawModel.value.trim() || '默认模型'}`,
+    `输出目录：${outputRoot || '未检测'}`,
+    `当前状态：${statusBox.textContent.split('\n').slice(-12).join('\n')}`
+  ].join('\n');
+}
+
 async function checkOpenClawStatus() {
   checkOpenClaw.disabled = true;
   openclawStatus.textContent = '检测中...';
@@ -560,16 +595,18 @@ function audioModeLabel(mode) {
 }
 
 function selectedRecordingLimitSeconds() {
+  let baseSeconds = 0;
   if (recordingDuration.value === 'custom') {
-    return parseVideoDurationSeconds(customDurationMinutes.value);
-  }
-  if (recordingDuration.value === 'calculated') {
+    baseSeconds = parseVideoDurationSeconds(customDurationMinutes.value);
+  } else if (recordingDuration.value === 'calculated') {
     const sourceSeconds = parseVideoDurationSeconds(sourceVideoDuration.value);
     const speed = Number(playbackSpeed.value || 1);
     if (!sourceSeconds || !Number.isFinite(speed) || speed <= 0) return 0;
-    return Math.ceil(sourceSeconds / speed) + 5;
+    baseSeconds = Math.ceil(sourceSeconds / speed);
+  } else {
+    baseSeconds = Number(recordingDuration.value || 0);
   }
-  return Number(recordingDuration.value || 0);
+  return baseSeconds > 0 ? baseSeconds + Number(recordingBufferSeconds.value || 0) : 0;
 }
 
 function parseVideoDurationSeconds(value) {
@@ -638,6 +675,30 @@ function updateDurationCalculator() {
     : '输入视频时长后自动计算录制时长，支持 90、01:30、01:30:00、中文冒号。';
 }
 
+function expectedFinishLabel(seconds) {
+  if (!seconds) return '预计完成：未设定';
+  const finish = new Date(Date.now() + seconds * 1000);
+  return `预计录制完成：${finish.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function updateWorkflowSummary() {
+  const limit = selectedRecordingLimitSeconds();
+  const template = DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || '通用整理';
+  const dedupeText = dedupeMode.options[dedupeMode.selectedIndex]?.text || dedupeMode.value;
+  const captureText = captureMode.value === 'screen' ? '全屏录制' : '框选范围';
+  const audioText = audioModeLabel(audioMode.value);
+  workflowTitle.textContent = captureMode.value === 'screen' ? '全屏录制，转成文档' : '框选录制，转成文档';
+  workflowSummary.textContent = `${audioText} · ${captureText} · ${dedupeText} · ${template}`;
+  expectedFinish.textContent = expectedFinishLabel(limit);
+  audioSummary.textContent = `声音：${audioText}`;
+  modelHint.textContent = model.value === 'medium'
+    ? 'medium 更准但更慢，适合重要课程、三倍速或口音较重内容。'
+    : (model.value === 'base' ? 'base 更快但准确率较低，适合短内容快速预览。' : 'small 适合多数直播；倍速高或内容重要时建议 medium。');
+  dedupeHint.textContent = dedupeMode.value === 'strong'
+    ? '强力去重适合重复严重的录制，但可能误删主播刻意重复强调。'
+    : (dedupeMode.value === 'off' ? '已关闭去重，卡顿回放造成的重复内容会保留。' : '普通去重默认移除卡顿回放造成的重复片段。');
+}
+
 function startButtonText() {
   if (recordingBackend) return '正在录制';
   if (framePrepared) return '开始录制';
@@ -660,7 +721,9 @@ function updateRecordingButtons() {
   resumeRecording.hidden = !isPaused;
   recordingDuration.disabled = isRecording;
   customDurationMinutes.disabled = isRecording || recordingDuration.value !== 'custom';
+  recordingBufferSeconds.disabled = isRecording;
   updateDurationCalculator();
+  updateWorkflowSummary();
 }
 
 function updateReadyRecordingWidget() {
@@ -861,11 +924,16 @@ function createJob(filePath, options = {}) {
     <div class="job-actions">
       <button class="start-transcribe">开始转录</button>
       <button class="stop-transcribe danger" hidden>停止转录</button>
+      <button class="copy-job-log">复制日志</button>
       <button class="delete-job danger">删除任务</button>
     </div>
   `;
   row.querySelector('.start-transcribe').addEventListener('click', () => runTranscription(row));
   row.querySelector('.stop-transcribe').addEventListener('click', () => stopTranscription(row));
+  row.querySelector('.copy-job-log').addEventListener('click', async () => {
+    await window.studio.copyText(row.querySelector('.job-log')?.textContent || '');
+    appendJobLog(row, '任务日志已复制。');
+  });
   row.querySelector('.delete-job').addEventListener('click', () => deleteJob(row));
   jobs.prepend(row);
   return row;
@@ -931,6 +999,7 @@ function addResultActions(row, result) {
     ['Markdown', result.markdown],
     ['TXT', result.txt],
     ['DOCX', result.docx],
+    ['SRT', result.srt],
     ['显示文件夹', result.output_dir]
   ]) {
     if (!target) continue;
@@ -1009,6 +1078,7 @@ function updateResultPathsAfterRename(result, renamedOutputDir) {
     markdown: replaceDir(result.markdown),
     txt: replaceDir(result.txt),
     docx: replaceDir(result.docx),
+    srt: replaceDir(result.srt),
     segments: replaceDir(result.segments)
   };
 }
@@ -1238,6 +1308,54 @@ async function startRecording() {
     logStatus('外部声音兼容录制会打开系统选择器，请在系统弹窗中选择红框所在屏幕或窗口。');
   }
   await startElectronRecording(selectedAudioMode);
+}
+
+async function testAudioBeforeRecording() {
+  if (audioMode.value === 'system') {
+    audioCheckStatus.textContent = '系统声音由 macOS 录屏权限提供，建议先短录 5 秒确认输出文件有声音。';
+    logStatus('系统声音检测提示：请先短录 5 秒确认系统音频轨正常。');
+    return;
+  }
+  testAudioInput.disabled = true;
+  audioCheckStatus.textContent = '正在检测麦克风输入...';
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      },
+      video: false
+    });
+    const context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.fftSize);
+    let peak = 0;
+    const start = performance.now();
+    while (performance.now() - start < 1600) {
+      analyser.getByteTimeDomainData(data);
+      for (const value of data) {
+        peak = Math.max(peak, Math.abs(value - 128) / 128);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    await context.close();
+    const result = { ok: peak > 0.03, peak };
+    audioCheckStatus.textContent = result.ok
+      ? `外部声音检测通过，当前音量峰值：${Math.round(result.peak * 100)}%。`
+      : '没有检测到明显麦克风声音，请检查输入设备或提高音量。';
+    logStatus(audioCheckStatus.textContent);
+  } catch (error) {
+    audioCheckStatus.textContent = `外部声音检测失败：${error.message || String(error)}`;
+    logStatus(audioCheckStatus.textContent);
+  } finally {
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    testAudioInput.disabled = false;
+  }
 }
 
 async function startNativeRecording(selectedAudioMode) {
@@ -1634,8 +1752,34 @@ openOutput.addEventListener('click', () => {
   if (outputRoot) window.studio.openPath(outputRoot);
 });
 
+copyRuntimeDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildRuntimeDiagnosticsText());
+  logStatus('运行诊断信息已复制。');
+});
+
 organizer.addEventListener('change', updateOrganizerFields);
 cloudAiProvider.addEventListener('change', applyCloudAiProviderPreset);
+model.addEventListener('change', updateWorkflowSummary);
+style.addEventListener('change', updateWorkflowSummary);
+documentTemplate.addEventListener('change', updateWorkflowSummary);
+subtitleMode.addEventListener('change', updateWorkflowSummary);
+dedupeMode.addEventListener('change', updateWorkflowSummary);
+audioMode.addEventListener('change', () => {
+  audioCheckStatus.textContent = audioMode.value === 'system'
+    ? '系统声音建议在正式录制前先短录 5 秒确认。'
+    : '外部声音使用麦克风，可点击检测声音确认输入。';
+  updateReadyRecordingWidget();
+  updateWorkflowSummary();
+});
+captureMode.addEventListener('change', updateWorkflowSummary);
+recordingBufferSeconds.addEventListener('change', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+glossaryText.addEventListener('input', () => {
+  localStorage.setItem(GLOSSARY_STORAGE_KEY, glossaryText.value);
+});
+testAudioInput.addEventListener('click', testAudioBeforeRecording);
 recordingDuration.addEventListener('change', () => {
   updateRecordingButtons();
   updateReadyRecordingWidget();
@@ -1685,6 +1829,8 @@ captureMode.addEventListener('change', async () => {
 updateOrganizerFields();
 renderLocalAiPresets();
 renderCloudAiPresets();
+glossaryText.value = localStorage.getItem(GLOSSARY_STORAGE_KEY) || '';
+updateWorkflowSummary();
 
 window.studio.onJobLog((payload) => {
   if (payload.message) logStatus(payload.message);

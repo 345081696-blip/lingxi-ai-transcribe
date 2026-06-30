@@ -826,6 +826,7 @@ function organizerArgs(options = {}) {
     if (options.cloudAiModel) args.push('--cloud-ai-model', options.cloudAiModel);
   }
   if (options.documentTemplate) args.push('--document-template', options.documentTemplate);
+  if (options.glossaryText) args.push('--glossary-text', options.glossaryText);
   return args;
 }
 
@@ -868,6 +869,12 @@ ipcMain.handle('choose-openclaw-command', async () => {
   if (result.canceled) return '';
   return result.filePaths[0] || '';
 });
+
+ipcMain.handle('test-microphone-level', async () => ({
+  ok: false,
+  peak: 0,
+  message: '请在主界面点击“选择录屏范围”后授权麦克风；macOS 桌面版的实时麦克风音量检测由浏览器权限控制。'
+}));
 
 ipcMain.handle('begin-recording-file', async (_event, payload = {}) => {
   fs.mkdirSync(outputRoot, { recursive: true });

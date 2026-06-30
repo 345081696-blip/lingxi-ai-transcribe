@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld('studio', {
   chooseMedia: () => ipcRenderer.invoke('choose-media'),
   chooseRecordingMedia: () => ipcRenderer.invoke('choose-recording-media'),
   chooseOpenClawCommand: () => ipcRenderer.invoke('choose-openclaw-command'),
+  testMicrophoneLevel: () => ipcRenderer.invoke('test-microphone-level'),
   beginRecordingFile: (payload) => ipcRenderer.invoke('begin-recording-file', payload),
   appendRecordingChunk: (payload) => ipcRenderer.invoke('append-recording-chunk', payload),
   finishRecordingFile: (payload) => ipcRenderer.invoke('finish-recording-file', payload),

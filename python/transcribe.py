@@ -306,7 +306,25 @@ def dedupe_segments(segments, mode):
     if removed:
         emit(f"重复内容去重：已移除 {len(removed)} 条疑似重复片段（模式：{mode}）。")
         emit_progress("dedupe", 78, f"重复内容去重完成：移除 {len(removed)} 条疑似重复片段。")
-    return kept, {"mode": mode, "removed": len(removed), "notes": notes}
+    gap_notes = detect_timeline_gaps(kept)
+    return kept, {"mode": mode, "removed": len(removed), "notes": notes, "gap_notes": gap_notes}
+
+
+def detect_timeline_gaps(segments):
+    notes = []
+    previous = None
+    for segment in segments:
+        if previous is not None:
+            gap = float(segment.get("start", 0)) - float(previous.get("end", previous.get("start", 0)))
+            if gap >= 8:
+                notes.append(
+                    f"[{int(previous.get('end', 0) // 60):02d}:{int(previous.get('end', 0) % 60):02d}] 到 "
+                    f"[{int(segment.get('start', 0) // 60):02d}:{int(segment.get('start', 0) % 60):02d}] 存在约 {int(gap)} 秒断点"
+                )
+                if len(notes) >= 12:
+                    break
+        previous = segment
+    return notes
 
 
 def recognize_subtitles(frames, output_dir):
@@ -454,6 +472,43 @@ def clean_segments(segments, style):
     return cleaned
 
 
+def parse_glossary(text):
+    terms = []
+    replacements = []
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "=" in line:
+            wrong, right = [part.strip() for part in line.split("=", 1)]
+            if wrong and right:
+                replacements.append((wrong, right))
+        else:
+            terms.append(line)
+    return terms, replacements
+
+
+def apply_glossary(segments, glossary_text):
+    terms, replacements = parse_glossary(glossary_text)
+    if not replacements:
+        return segments, {"terms": terms, "replacements": [], "applied": 0}
+    applied = 0
+    updated = []
+    for segment in segments:
+        text = segment.get("text", "")
+        original = text
+        for wrong, right in replacements:
+            text = text.replace(wrong, right)
+        if text != original:
+            applied += 1
+        updated.append({**segment, "text": text})
+    return updated, {
+        "terms": terms,
+        "replacements": [f"{wrong}=>{right}" for wrong, right in replacements],
+        "applied": applied,
+    }
+
+
 def split_sentences(text):
     parts = re.split(r"(?<=[。！？!?])\s*", text)
     return [part.strip() for part in parts if part.strip()]
@@ -485,7 +540,7 @@ def build_document(cleaned, style, document_template="general"):
     return body.strip() or full_text
 
 
-def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_report=None, document_template="general"):
+def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
     style_hint = {
         "clean": "清理废话、口头禅、重复句和笑声，保留重点信息，输出适合阅读的简体中文整理稿。",
         "outline": "提炼成有层次的简体中文提纲，保留关键观点、结论和行动项。",
@@ -503,6 +558,19 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
         dedupe_hint = f"去重模式：{mode}；已预处理移除疑似重复片段：{removed} 条。"
         if notes:
             dedupe_hint = f"{dedupe_hint}\n疑似重复片段示例：\n{notes}"
+        gaps = "\n".join(dedupe_report.get("gap_notes") or [])
+        if gaps:
+            dedupe_hint = f"{dedupe_hint}\n疑似播放断点：\n{gaps}"
+    glossary_terms = "无"
+    if glossary_report:
+        terms = glossary_report.get("terms") or []
+        replacements = glossary_report.get("replacements") or []
+        lines = []
+        if terms:
+            lines.append("专有词：" + "、".join(terms[:40]))
+        if replacements:
+            lines.append("错词修正：" + "；".join(replacements[:40]))
+        glossary_terms = "\n".join(lines) if lines else "无"
     return textwrap.dedent(f"""
     你是“零创AI 智能转写器”的文档整理助手。
     请基于下面的语音转写内容进行二次整理，并参考视频画面字幕。
@@ -513,9 +581,13 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
     4. 删除无意义语气词、笑声、掌声、背景音乐提示和明显废话。
     5. 不要编造原文没有的信息。
     6. 如果语音识别和画面字幕冲突，优先根据上下文判断；专有名词、人名、课程术语可优先参考字幕。
-    7. 如果发现在线播放卡顿、回放、跳回开头导致的重复段落，只保留一次；但对主播有意强调的重点不要过度删除。
-    8. 如果发现上下文明显断裂、缺少承接，保留可确认内容，并在末尾用一句话标注“可能存在因播放卡顿造成的内容缺失”。
-    9. 只输出最终整理稿，不要解释你的处理过程。
+    7. 优先保留和修正下面“专有词与错词修正”中的术语。
+    8. 如果发现在线播放卡顿、回放、跳回开头导致的重复段落，只保留一次；但对主播有意强调的重点不要过度删除。
+    9. 如果发现上下文明显断裂、缺少承接，保留可确认内容，并在末尾用一句话标注“可能存在因播放卡顿造成的内容缺失”。
+    10. 只输出最终整理稿，不要解释你的处理过程。
+
+    专有词与错词修正：
+    {glossary_terms}
 
     重复/缺失处理参考：
     {dedupe_hint}
@@ -528,8 +600,8 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
     """).strip()
 
 
-def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference="", dedupe_report=None, document_template="general"):
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
+def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
     cmd = [
         openclaw_bin,
         "infer",
@@ -557,12 +629,12 @@ def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, 
     return text
 
 
-def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference="", dedupe_report=None, document_template="general"):
+def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
     if not local_ai_base_url:
         raise RuntimeError("本地大模型地址为空。")
     if not local_ai_model:
         raise RuntimeError("本地大模型名称为空。")
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
     base_url = local_ai_base_url.rstrip("/")
     if base_url.endswith("/v1"):
         endpoint = f"{base_url}/chat/completions"
@@ -614,7 +686,7 @@ def chat_completion_endpoint(base_url):
     return f"{value}/v1/chat/completions"
 
 
-def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None, document_template="general"):
+def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
     api_key = os.environ.get("TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY", "").strip()
     if not cloud_ai_base_url:
         raise RuntimeError("云端 API 地址为空。")
@@ -622,7 +694,7 @@ def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_mo
         raise RuntimeError("云端模型名称为空。")
     if not api_key:
         raise RuntimeError("云端 API Key 为空。")
-    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template)
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
     endpoint = chat_completion_endpoint(cloud_ai_base_url)
     payload = {
         "model": cloud_ai_model,
@@ -697,7 +769,7 @@ def extract_text(value):
     return ""
 
 
-def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None, document_template="general"):
+def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
     report = {
         "organizer_requested": organizer,
         "organizer_actual": "local",
@@ -716,7 +788,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
         return body, "local", report
     if organizer == "openclaw":
         try:
-            enhanced = run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference, dedupe_report, document_template)
+            enhanced = run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference, dedupe_report, document_template, glossary_report)
             emit_progress("organize", 92, "OpenClaw/Qwen 增强整理完成。")
             report["organizer_actual"] = "openclaw"
             return enhanced, "openclaw", report
@@ -728,7 +800,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
             return body, "local-fallback", report
     if organizer == "cloudai":
         try:
-            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report, document_template)
+            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report, document_template, glossary_report)
             emit_progress("organize", 92, "云端大模型增强整理完成。")
             report["organizer_actual"] = "cloudai"
             return enhanced, "cloudai", report
@@ -739,7 +811,7 @@ def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model
             report["failure_reason"] = str(error)
             return body, "cloudai-fallback", report
     try:
-        enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report, document_template)
+        enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report, document_template, glossary_report)
         emit_progress("organize", 92, "本地大模型增强整理完成。")
         report["organizer_actual"] = "localai"
         return enhanced, "localai", report
@@ -764,7 +836,7 @@ def report_label(value):
     return labels.get(value, value or "未记录")
 
 
-def build_processing_report_lines(language, style, organizer_report, dedupe_report=None, subtitle_count=0):
+def build_processing_report_lines(language, style, organizer_report, dedupe_report=None, subtitle_count=0, glossary_report=None):
     lines = [
         f"识别语言：{language}",
         f"整理方式：{style}",
@@ -790,11 +862,36 @@ def build_processing_report_lines(language, style, organizer_report, dedupe_repo
         lines.append("失败原因：无")
     if dedupe_report:
         lines.append(f"重复内容去重：{dedupe_report.get('mode')}；移除 {dedupe_report.get('removed', 0)} 条")
+        if dedupe_report.get("gap_notes"):
+            lines.append(f"疑似播放断点：{len(dedupe_report.get('gap_notes') or [])} 处")
+    if glossary_report:
+        lines.append(f"专有词数量：{len(glossary_report.get('terms') or [])}；错词修正命中：{glossary_report.get('applied', 0)} 段")
     lines.append(f"字幕辅助识别数量：{subtitle_count} 条")
     return [to_simplified(line) for line in lines]
 
 
-def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None, document_template="general"):
+def srt_timestamp(seconds):
+    value = max(0, float(seconds or 0))
+    hours = int(value // 3600)
+    minutes = int((value % 3600) // 60)
+    secs = int(value % 60)
+    millis = int((value - int(value)) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+
+def write_srt(output_path, segments):
+    lines = []
+    for index, item in enumerate(segments, start=1):
+        lines.extend([
+            str(index),
+            f"{srt_timestamp(item.get('start'))} --> {srt_timestamp(item.get('end'))}",
+            item.get("text", ""),
+            "",
+        ])
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None, document_template="general", glossary_report=None):
     emit_progress("document", 90, "正在生成转写文档...")
     title = to_simplified(source_path.stem)
     cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
@@ -822,22 +919,26 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
         cloud_ai_model,
         subtitle_reference,
         dedupe_report,
-        document_template
+        document_template,
+        glossary_report
     )
     body = to_simplified(body)
     dedupe_summary = ""
     if dedupe_report and dedupe_report.get("mode") != "off":
         notes = "\n".join(dedupe_report.get("notes") or [])
+        gaps = "\n".join(dedupe_report.get("gap_notes") or [])
         dedupe_summary = (
             f"模式：{dedupe_report.get('mode')}；已移除疑似重复片段：{dedupe_report.get('removed', 0)} 条。"
             + (f"\n\n{notes}" if notes else "")
+            + (f"\n\n疑似播放断点：\n{gaps}" if gaps else "")
         )
     report_lines = build_processing_report_lines(
         language,
         style,
         organizer_report,
         dedupe_report,
-        len(subtitles or [])
+        len(subtitles or []),
+        glossary_report
     )
     md_report = "\n".join(f"- {line}" for line in report_lines)
     txt_report = "\n".join(report_lines)
@@ -845,6 +946,8 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
     markdown = output_dir / "转写文档.md"
     txt = output_dir / "转写文档.txt"
     docx = output_dir / "转写文档.docx"
+    srt = output_dir / "转写字幕.srt"
+    write_srt(srt, cleaned)
 
     md_content = (
         f"# {title}\n\n"
@@ -884,7 +987,7 @@ def write_outputs(output_dir, source_path, cleaned, language, style, organizer, 
     doc.save(docx)
     emit_progress("document", 98, "转写文档已生成。")
 
-    return markdown, txt, docx, body, organizer_used, organizer_report
+    return markdown, txt, docx, srt, body, organizer_used, organizer_report
 
 
 def main():
@@ -905,6 +1008,7 @@ def main():
     parser.add_argument("--dedupe-mode", default="normal", choices=["off", "normal", "strong"])
     parser.add_argument("--document-template", default="general", choices=list(DOCUMENT_TEMPLATES.keys()))
     parser.add_argument("--segments-json", default="")
+    parser.add_argument("--glossary-text", default="")
     args = parser.parse_args()
 
     input_path = Path(args.input).expanduser().resolve()
@@ -918,6 +1022,7 @@ def main():
         cleaned = json.loads(segments_path.read_text(encoding="utf-8"))
         cleaned = clean_segments(cleaned, args.style)
         cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        cleaned, glossary_report = apply_glossary(cleaned, args.glossary_text)
         detected_language = args.language or "zh"
         dedupe_report = {"mode": "off", "removed": 0, "notes": ["换模板生成复用已处理逐字稿，未重新执行语音识别和去重。"]}
         subtitles = []
@@ -936,6 +1041,7 @@ def main():
         segments, detected_language = engine(audio_path, duration)
         cleaned = clean_segments(segments, args.style)
         cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        cleaned, glossary_report = apply_glossary(cleaned, args.glossary_text)
         cleaned, dedupe_report = dedupe_segments(cleaned, args.dedupe_mode)
 
         subtitles = []
@@ -954,7 +1060,7 @@ def main():
     raw_json = output_dir / "segments.json"
     raw_json.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    markdown, txt, docx, body, organizer_used, organizer_report = write_outputs(
+    markdown, txt, docx, srt, body, organizer_used, organizer_report = write_outputs(
         output_dir,
         input_path,
         cleaned,
@@ -970,6 +1076,7 @@ def main():
         subtitles,
         dedupe_report,
         args.document_template,
+        glossary_report,
     )
     summary = body.splitlines()[0][:120] if body else "已完成转写。"
     emit_progress("done", 100, "转写完成。")
@@ -978,6 +1085,7 @@ def main():
         "markdown": str(markdown),
         "txt": str(txt),
         "docx": str(docx),
+        "srt": str(srt),
         "segments": str(raw_json),
         "summary": summary,
         "language": detected_language,

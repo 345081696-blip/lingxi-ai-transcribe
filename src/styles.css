@@ -267,10 +267,35 @@ input::placeholder {
   color: var(--subtle);
 }
 
+textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 86px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px 10px;
+  background: #0d131b;
+  color: var(--text);
+  outline: none;
+  font: inherit;
+  line-height: 1.5;
+}
+
+textarea:focus {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px rgba(67, 214, 200, 0.12);
+}
+
 input[type="checkbox"] {
   width: 16px;
   height: 16px;
   accent-color: var(--cyan);
+}
+
+.field-hint {
+  color: var(--subtle);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .check-row {
@@ -364,6 +389,51 @@ label.disabled,
 .workspace > * {
   position: relative;
   z-index: 1;
+}
+
+.hero-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  padding: 16px 18px;
+  border: 1px solid rgba(67, 214, 200, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(67, 214, 200, 0.13), transparent 54%),
+    rgba(8, 13, 23, 0.68);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.2);
+}
+
+.hero-status h2 {
+  margin-top: 4px;
+  font-size: 22px;
+}
+
+.hero-status p {
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.eyebrow {
+  color: var(--cyan);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.workflow-metrics {
+  display: grid;
+  gap: 8px;
+  min-width: 210px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workflow-metrics span {
+  padding: 7px 9px;
+  border: 1px solid rgba(91, 140, 255, 0.18);
+  border-radius: 7px;
+  background: rgba(91, 140, 255, 0.06);
 }
 
 .toolbar {
@@ -619,5 +689,14 @@ pre {
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+  }
+
+  .hero-status {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workflow-metrics {
+    min-width: 0;
   }
 }

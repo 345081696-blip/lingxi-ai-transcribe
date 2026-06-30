@@ -1,6 +1,6 @@
 # 零创AI 智能转写器
 
-这是一个本机优先的录屏转写与音视频转写桌面应用，当前版本为 `v0.2.23`。
+这是一个本机优先的录屏转写与音视频转写桌面应用，当前版本为 `v0.2.24`。
 
 GitHub 仓库名使用 `zero-create-ai-smart-transcribe`，对应中文品牌“零创”。旧内部标识中的 `lingchuang` 仅保留在 macOS appId 和本机配置 key 中，用于兼容已安装版本的权限与历史设置。
 
@@ -15,6 +15,8 @@ GitHub 仓库名使用 `zero-create-ai-smart-transcribe`，对应中文品牌“
 - 支持字幕辅助识别、重复内容去重、定时录制、按播放倍速自动计算录制时长。
 - 支持文档模板：通用整理、直播复盘、课程笔记、素材提取、成交话术、金句提取。
 - 支持转写完成后“换模板生成”，复用已有 `segments.json` 重新整理，不重新跑 Whisper。
+- 支持专有词和错词修正、SRT 字幕导出、任务日志复制、运行诊断复制。
+- 支持结束缓冲和预计录制完成时间提示。
 - Markdown、TXT、DOCX 会写入处理报告，记录智能整理实际使用状态和失败原因。
 
 输出文件会保存到 `~/Documents/TranscribeStudio`，每个任务生成：
@@ -22,6 +24,7 @@ GitHub 仓库名使用 `zero-create-ai-smart-transcribe`，对应中文品牌“
 - `转写文档.md`
 - `转写文档.txt`
 - `转写文档.docx`
+- `转写字幕.srt`
 - `segments.json`
 
 ## AI 流程
@@ -33,7 +36,7 @@ GitHub 仓库名使用 `zero-create-ai-smart-transcribe`，对应中文品牌“
 
 ## 云端大模型 API
 
-`v0.2.23` 支持 OpenAI 兼容云端 API 整理能力，并增加常用服务商预设。界面中选择“云端大模型 API”，先选服务商预设或自定义，再填写：
+`v0.2.24` 支持 OpenAI 兼容云端 API 整理能力，并增加常用服务商预设。界面中选择“云端大模型 API”，先选服务商预设或自定义，再填写：
 
 - API 地址：例如 `https://api.deepseek.com`、`https://api.openai.com`
 - 模型名称：例如 `deepseek-chat`、`gpt-4.1-mini`、`qwen-plus`

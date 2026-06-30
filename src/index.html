@@ -33,6 +33,7 @@
               <option value="medium">medium：更准</option>
               <option value="base">base：更快</option>
             </select>
+            <span id="modelHint" class="field-hint">small 适合多数直播；倍速高或内容重要时建议 medium。</span>
           </label>
           <label>
             <span>整理方式</span>
@@ -67,6 +68,7 @@
               <option value="off">关闭</option>
               <option value="strong">强力去重</option>
             </select>
+            <span id="dedupeHint" class="field-hint">普通去重默认移除卡顿回放造成的重复片段；强力去重可能误删刻意强调。</span>
           </label>
           <label>
             <span>智能整理</span>
@@ -151,10 +153,14 @@
           </div>
           <label>
             <span>录制声音</span>
-            <select id="audioMode">
-              <option value="system">系统声音</option>
-              <option value="microphone">外部声音</option>
-            </select>
+            <div class="inline-control">
+              <select id="audioMode">
+                <option value="system">系统声音</option>
+                <option value="microphone">外部声音</option>
+              </select>
+              <button id="testAudioInput" type="button">检测声音</button>
+            </div>
+            <span id="audioCheckStatus" class="field-hint">系统声音建议在正式录制前先短录 5 秒确认；外部声音可直接检测麦克风。</span>
           </label>
           <label>
             <span>录制范围</span>
@@ -176,7 +182,7 @@
                 <option value="custom">自定义</option>
                 <option value="calculated">按视频时长计算</option>
               </select>
-              <input id="customDurationMinutes" type="text" inputmode="numeric" placeholder="00:00:00" disabled />
+              <input id="customDurationMinutes" type="text" inputmode="text" placeholder="00:00:00" disabled />
             </div>
             <div id="durationCalculator" class="duration-calculator" hidden>
               <input id="sourceVideoDuration" type="text" inputmode="text" placeholder="视频时长，如 01:30 或 90 分钟" />
@@ -190,6 +196,20 @@
               </select>
               <span id="durationHint">输入视频时长后自动计算录制时长。</span>
             </div>
+          </label>
+          <label>
+            <span>结束缓冲</span>
+            <select id="recordingBufferSeconds">
+              <option value="5">多录 5 秒</option>
+              <option value="10">多录 10 秒</option>
+              <option value="30">多录 30 秒</option>
+              <option value="0">不加缓冲</option>
+            </select>
+          </label>
+          <label>
+            <span>专有词与错词修正</span>
+            <textarea id="glossaryText" rows="4" placeholder="每行一条：&#10;零创AI&#10;错误词=正确词&#10;OPC=OBC"></textarea>
+            <span class="field-hint">用于人名、品牌名、课程术语和常见错词修正，会写入处理报告。</span>
           </label>
           <label class="check-row">
             <input id="autoTranscribe" type="checkbox" checked />
@@ -218,11 +238,23 @@
       </aside>
 
       <section class="workspace">
+        <section class="hero-status">
+          <div>
+            <span class="eyebrow">当前工作流</span>
+            <h2 id="workflowTitle">框选录制，转成文档</h2>
+            <p id="workflowSummary">系统声音 · 框选范围 · 普通去重 · 通用整理</p>
+          </div>
+          <div class="workflow-metrics">
+            <span id="expectedFinish">预计完成：未设定</span>
+            <span id="audioSummary">声音：系统声音</span>
+          </div>
+        </section>
         <div class="toolbar">
           <button id="pickMedia" class="primary">上传短视频/音频</button>
           <button id="loadSources" class="primary">选择录屏范围</button>
           <button id="rewriteMedia">重新转写</button>
           <button id="showHelp">使用说明</button>
+          <button id="copyRuntimeDiagnostics" type="button">复制诊断</button>
           <button id="pauseRecording" disabled>暂停录制</button>
           <button id="adjustRecordingFrame" hidden disabled>调整录屏范围</button>
           <button id="resumeRecording" hidden disabled>继续录制</button>
@@ -245,7 +277,7 @@
           <pre id="status">正在检查本机环境...</pre>
         </section>
       </section>
-      <div id="version" class="version">v0.2.23</div>
+      <div id="version" class="version">v0.2.24</div>
     </main>
     <dialog id="helpDialog" class="help-dialog">
       <div class="help-card">
