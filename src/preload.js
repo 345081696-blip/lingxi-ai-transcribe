@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('studio', {
   getRecordingFrame: () => ipcRenderer.invoke('get-recording-frame'),
   recordingFrameCommand: (command) => ipcRenderer.invoke('recording-frame-command', command),
   onRecordingFrameMode: (handler) => ipcRenderer.on('recording-frame-mode', (_event, mode) => handler(mode)),
+  listCaptureWindows: () => ipcRenderer.invoke('list-capture-windows'),
   nativeRecorderAvailable: () => ipcRenderer.invoke('native-recorder-available'),
   startNativeRecording: (options) => ipcRenderer.invoke('start-native-recording', options),
   stopNativeRecording: () => ipcRenderer.invoke('stop-native-recording'),

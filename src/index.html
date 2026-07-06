@@ -167,6 +167,7 @@
             <select id="captureMode">
               <option value="region">框选范围</option>
               <option value="screen">全屏录制</option>
+              <option value="window">锁定窗口</option>
             </select>
           </label>
           <label>
@@ -287,9 +288,9 @@
         </div>
         <div class="help-content">
           <h3>录制在线播放内容</h3>
-          <p>先选择“系统声音”或“外部声音”，再选择“框选范围”或“全屏录制”。点击“选择录屏范围”后调整线框，确认范围后再开始录制；悬浮条可暂停、继续、停止，主界面最小化或关闭也不应中断后台任务。</p>
+          <p>先选择“系统声音”或“外部声音”，再选择“框选范围”“全屏录制”或“锁定窗口”。点击“选择录屏范围”后调整线框，确认范围后再开始录制；悬浮条可暂停、继续、停止，主界面最小化或关闭也不应中断后台任务。</p>
           <h3>录制范围</h3>
-          <p>框选模式可拖动上方移动柄，或用边角调整大小。暂停时可调整录屏范围，继续录制会按新范围采集；全屏模式下可用退出全屏回到框选模式。</p>
+          <p>框选模式可拖动上方移动柄，或用边角调整大小。暂停时可调整录屏范围，继续录制会按新范围采集；全屏模式下可用退出全屏回到框选模式。锁定窗口模式会绑定到你选中的那个窗口，适合把抖音放在单独桌面后切去别的桌面继续录制。</p>
           <h3>定时与倍速</h3>
           <p>录制定时支持不限时、固定时长、自定义时长，也支持“按视频时长计算”。自定义时长可输入 00:30:00、30:00 或 30，软件按时分秒理解；输入原视频时长并选择 1.0 到 3.0 倍播放速度，软件会自动计算录制时长，到点停止并按设置自动转写。</p>
           <h3>上传或重新转写</h3>
@@ -331,6 +332,21 @@
           </div>
         </div>
       </form>
+    </dialog>
+    <dialog id="windowPickerDialog" class="help-dialog window-picker-dialog">
+      <div class="help-card">
+        <div class="help-head">
+          <h2>选择要锁定的窗口</h2>
+          <div class="dialog-actions">
+            <button id="refreshWindowPicker" type="button">刷新列表</button>
+            <button id="cancelWindowPicker" type="button">取消</button>
+          </div>
+        </div>
+        <div class="help-content">
+          <p id="windowPickerHint">请选择正在播放内容的窗口。开始录制后，即使你切换到别的桌面，也会优先持续录这个窗口。</p>
+          <div id="windowPickerList" class="window-picker-list"></div>
+        </div>
+      </div>
     </dialog>
     <dialog id="statusLogDialog" class="help-dialog status-log-dialog">
       <div class="help-card">

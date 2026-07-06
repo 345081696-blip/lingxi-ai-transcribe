@@ -78,6 +78,11 @@ const statusLogContent = document.querySelector('#statusLogContent');
 const closeStatusLog = document.querySelector('#closeStatusLog');
 const copyStatusLog = document.querySelector('#copyStatusLog');
 const clearStatusLog = document.querySelector('#clearStatusLog');
+const windowPickerDialog = document.querySelector('#windowPickerDialog');
+const windowPickerHint = document.querySelector('#windowPickerHint');
+const windowPickerList = document.querySelector('#windowPickerList');
+const refreshWindowPicker = document.querySelector('#refreshWindowPicker');
+const cancelWindowPicker = document.querySelector('#cancelWindowPicker');
 const organizerWarningDialog = document.querySelector('#organizerWarningDialog');
 const organizerWarningText = document.querySelector('#organizerWarningText');
 const closeOrganizerWarning = document.querySelector('#closeOrganizerWarning');
@@ -140,6 +145,8 @@ let autoStopTimer = null;
 let autoStopTriggered = false;
 let adjustingPausedFrame = false;
 let namePromptQueue = Promise.resolve();
+let selectedWindowCapture = null;
+let pendingWindowCapture = null;
 
 function logStatus(text) {
   const current = statusBox.textContent.trim();
@@ -441,7 +448,7 @@ function buildRuntimeDiagnosticsText() {
     `字幕辅助：${subtitleMode.value}`,
     `重复内容去重：${dedupeMode.value}`,
     `录制声音：${audioModeLabel(audioMode.value)}`,
-    `录制范围：${captureMode.value === 'screen' ? '全屏录制' : '框选范围'}`,
+    `录制范围：${captureModeLabel(captureMode.value)}`,
     `录制定时：${recordingLimitLabel(selectedRecordingLimitSeconds())}`,
     `结束缓冲：${recordingBufferSeconds.value || 0} 秒`,
     `智能整理：${organizer.value}`,
@@ -594,6 +601,12 @@ function audioModeLabel(mode) {
   return '系统声音';
 }
 
+function captureModeLabel(mode) {
+  if (mode === 'screen') return '全屏录制';
+  if (mode === 'window') return '锁定窗口';
+  return '框选范围';
+}
+
 function selectedRecordingLimitSeconds() {
   let baseSeconds = 0;
   if (recordingDuration.value === 'custom') {
@@ -685,9 +698,13 @@ function updateWorkflowSummary() {
   const limit = selectedRecordingLimitSeconds();
   const template = DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || '通用整理';
   const dedupeText = dedupeMode.options[dedupeMode.selectedIndex]?.text || dedupeMode.value;
-  const captureText = captureMode.value === 'screen' ? '全屏录制' : '框选范围';
+  const captureText = captureMode.value === 'window' && framePrepared && selectedWindowCapture
+    ? `锁定窗口 · ${selectedWindowCapture.name}`
+    : captureModeLabel(captureMode.value);
   const audioText = audioModeLabel(audioMode.value);
-  workflowTitle.textContent = captureMode.value === 'screen' ? '全屏录制，转成文档' : '框选录制，转成文档';
+  workflowTitle.textContent = captureMode.value === 'screen'
+    ? '全屏录制，转成文档'
+    : (captureMode.value === 'window' ? '锁定窗口录制，转成文档' : '框选录制，转成文档');
   workflowSummary.textContent = `${audioText} · ${captureText} · ${dedupeText} · ${template}`;
   expectedFinish.textContent = expectedFinishLabel(limit);
   audioSummary.textContent = `声音：${audioText}`;
@@ -702,7 +719,9 @@ function updateWorkflowSummary() {
 function startButtonText() {
   if (recordingBackend) return '正在录制';
   if (framePrepared) return '开始录制';
-  return captureMode.value === 'region' ? '选择录屏范围' : '开始录制';
+  if (captureMode.value === 'region') return '选择录屏范围';
+  if (captureMode.value === 'window') return '选择要锁定的窗口';
+  return '开始录制';
 }
 
 function updateRecordingButtons() {
@@ -752,12 +771,80 @@ function resetCaptureFrameState() {
 }
 
 async function prepareCaptureFrame() {
+  if (captureMode.value === 'window') {
+    if (!selectedWindowCapture?.windowId) {
+      throw new Error('请先选择要锁定的窗口。');
+    }
+    await window.studio.recordingFrameCommand('passthrough');
+    return {
+      mode: 'window',
+      window: {
+        sourceId: selectedWindowCapture.sourceId,
+        windowId: selectedWindowCapture.windowId,
+        name: selectedWindowCapture.name
+      }
+    };
+  }
   if (captureMode.value !== 'region' && !framePrepared) {
     await window.studio.recordingFrameCommand('passthrough');
     return { mode: 'screen' };
   }
   const frame = await window.studio.getRecordingFrame();
   return frameToCapture(frame);
+}
+
+function renderWindowPicker(items) {
+  if (!items.length) {
+    windowPickerList.innerHTML = '<div class="window-picker-empty">没有找到可锁定的窗口。请先把要录制的视频窗口打开到前台，再点一次刷新列表。</div>';
+    return;
+  }
+  windowPickerList.innerHTML = '';
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'window-picker-item';
+    const thumb = item.thumbnailDataUrl
+      ? Object.assign(document.createElement('img'), { className: 'window-picker-thumb', src: item.thumbnailDataUrl, alt: '' })
+      : Object.assign(document.createElement('div'), { className: 'window-picker-thumb' });
+    const meta = document.createElement('div');
+    meta.className = 'window-picker-meta';
+    const title = document.createElement('strong');
+    title.textContent = item.name;
+    const idText = document.createElement('span');
+    idText.textContent = `窗口 ID：${item.windowId}`;
+    const hint = document.createElement('span');
+    hint.textContent = '选中后会锁定录制这个窗口，切到其他桌面也继续跟着它录。';
+    meta.append(title, idText, hint);
+    button.append(thumb, meta);
+    button.addEventListener('click', () => {
+      pendingWindowCapture = item;
+      windowPickerDialog.returnValue = 'select';
+      windowPickerDialog.close();
+    });
+    windowPickerList.appendChild(button);
+  }
+}
+
+async function loadWindowPickerOptions(message = '请选择正在播放内容的窗口。开始录制后，即使你切换到别的桌面，也会优先持续录这个窗口。') {
+  windowPickerHint.textContent = message;
+  windowPickerList.innerHTML = '<div class="window-picker-empty">正在读取窗口列表...</div>';
+  const items = await window.studio.listCaptureWindows();
+  renderWindowPicker(items);
+}
+
+async function promptWindowCaptureSelection() {
+  pendingWindowCapture = null;
+  await loadWindowPickerOptions();
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      windowPickerDialog.removeEventListener('close', handleClose);
+      const selected = windowPickerDialog.returnValue === 'select' ? pendingWindowCapture : null;
+      pendingWindowCapture = null;
+      resolve(selected);
+    };
+    windowPickerDialog.addEventListener('close', handleClose);
+    windowPickerDialog.showModal();
+  });
 }
 
 function frameToCapture(frame) {
@@ -1193,6 +1280,19 @@ loadSources.addEventListener('click', async () => {
       logStatus('录制范围线框已显示，但此时还没有开始录制。请拖到主屏或副屏的视频位置，调整好后点击主界面或线框上的“开始录制”。');
       return;
     }
+    if (!framePrepared && captureMode.value === 'window') {
+      const selected = await promptWindowCaptureSelection();
+      if (!selected) {
+        logStatus('已取消选择锁定窗口。');
+        return;
+      }
+      selectedWindowCapture = selected;
+      framePrepared = true;
+      currentAudioLabel = audioModeLabel(audioMode.value);
+      updateRecordingButtons();
+      logStatus(`已锁定窗口：${selected.name}。现在点击“开始录制”即可开始；切换到其他桌面后会继续录这个窗口。`);
+      return;
+    }
     await startRecording();
   } catch (error) {
     logStatus(`录屏启动失败：${error.message || String(error)}`);
@@ -1204,9 +1304,12 @@ window.studio.onNativeRecordingEvent((payload) => {
   if (payload.event === 'log' && payload.message) logStatus(payload.message);
   if (payload.event === 'started') logStatus('原生录制已开始写入文件。');
   if (payload.event === 'captureStarted') {
-    logStatus(payload.audioMode === 'microphone'
-      ? '原生屏幕捕获已启动，外部麦克风录制已请求。'
-      : '原生屏幕捕获已启动，系统音频录制已请求。');
+    const targetText = payload.captureTarget === 'window'
+      ? `原生窗口捕获已启动${payload.windowTitle ? `：${payload.windowTitle}` : ''}。`
+      : (payload.audioMode === 'microphone'
+        ? '原生屏幕捕获已启动，外部麦克风录制已请求。'
+        : '原生屏幕捕获已启动，系统音频录制已请求。');
+    logStatus(targetText);
   }
   if (payload.event === 'error') {
     logStatus(`原生录制错误：${payload.message || '未知错误'}`);
@@ -1296,7 +1399,13 @@ async function startRecording() {
   recordingLimitSeconds = selectedRecordingLimitSeconds();
   autoStopTriggered = false;
   currentCapture = await prepareCaptureFrame();
-  if (selectedAudioMode === 'system' && await window.studio.nativeRecorderAvailable()) {
+  const nativeAvailable = await window.studio.nativeRecorderAvailable();
+  if (currentCapture.mode === 'window') {
+    if (!nativeAvailable) throw new Error('锁定窗口录制当前只支持 macOS 原生录制。');
+    await startNativeRecording(selectedAudioMode);
+    return;
+  }
+  if (selectedAudioMode === 'system' && nativeAvailable) {
     try {
       await startNativeRecording(selectedAudioMode);
       return;
@@ -1372,6 +1481,9 @@ async function startNativeRecording(selectedAudioMode) {
   logStatus(selectedAudioMode === 'system'
     ? '正在启动 macOS 原生录屏，会请求屏幕和系统音频权限。'
     : '正在启动 macOS 原生录屏，会请求屏幕录制和麦克风权限。');
+  if (currentCapture?.mode === 'window' && currentCapture.window?.name) {
+    logStatus(`本次会锁定窗口录制：${currentCapture.window.name}`);
+  }
   try {
     await startNativeSegment(selectedAudioMode);
     await window.studio.recordingFrameCommand('passthrough');
@@ -1821,10 +1933,20 @@ copyCloudAiDiagnostics.addEventListener('click', async () => {
 captureMode.addEventListener('change', async () => {
   if (!recordingBackend) {
     framePrepared = false;
+    selectedWindowCapture = null;
     await window.studio.hideRecordingFrame();
     await window.studio.hideRecordingWidget();
     updateRecordingButtons();
   }
+});
+
+refreshWindowPicker.addEventListener('click', async () => {
+  await loadWindowPickerOptions('窗口列表已刷新。请选择正在播放内容的窗口。');
+});
+
+cancelWindowPicker.addEventListener('click', () => {
+  windowPickerDialog.returnValue = 'cancel';
+  windowPickerDialog.close();
 });
 updateOrganizerFields();
 renderLocalAiPresets();

@@ -22,6 +22,13 @@ let isQuitting = false;
 const activeTranscriptions = new Map();
 const activeRecordings = new Map();
 
+function parseWindowIdFromSourceId(sourceId) {
+  const match = String(sourceId || '').match(/^window:(\d+):/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
 function canSend(win) {
   return Boolean(win && !win.isDestroyed() && win.webContents && !win.webContents.isDestroyed());
 }
@@ -337,6 +344,32 @@ function configureCapturePermissions() {
     callback(sources[0] ? { video: sources[0] } : {});
   }, { useSystemPicker: true });
 }
+
+ipcMain.handle('list-capture-windows', async () => {
+  const excludedNames = new Set([productName, '录制范围', '录制控制']);
+  const sources = await desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: { width: 320, height: 200 },
+    fetchWindowIcons: false
+  });
+  return sources
+    .map((source) => {
+      const windowId = parseWindowIdFromSourceId(source.id);
+      if (!windowId) return null;
+      const name = String(source.name || '').trim() || `窗口 ${windowId}`;
+      if (excludedNames.has(name)) return null;
+      return {
+        sourceId: source.id,
+        windowId,
+        name,
+        thumbnailDataUrl: source.thumbnail && !source.thumbnail.isEmpty()
+          ? source.thumbnail.toDataURL()
+          : null
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -1051,7 +1084,13 @@ ipcMain.handle('start-native-recording', async (event, options = {}) => {
   const filePath = path.join(outputRoot, `recording-${new Date().toISOString().replace(/[:.]/g, '-')}.mp4`);
   const args = ['start', filePath, audioMode];
   const capture = options.capture || {};
-  if (capture.screen && capture.region) {
+  if (capture.window?.windowId) {
+    args.push(
+      '--window-id',
+      String(Math.round(capture.window.windowId)),
+      'com.lingchuang.smarttranscribe'
+    );
+  } else if (capture.screen && capture.region) {
     args.push(
       String(Math.round(capture.screen.x)),
       String(Math.round(capture.screen.y)),

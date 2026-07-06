@@ -36,35 +36,49 @@ final class NativeRecorder {
     private var audioMode: String
     private var screenOrigin: CGPoint?
     private var cropRect: CGRect?
+    private var windowID: UInt32?
     private var excludedBundleID: String?
     private var isStopping = false
 
-    init(outputURL: URL, audioMode: String, screenOrigin: CGPoint?, cropRect: CGRect?, excludedBundleID: String?) {
+    init(outputURL: URL, audioMode: String, screenOrigin: CGPoint?, cropRect: CGRect?, windowID: UInt32?, excludedBundleID: String?) {
         self.outputURL = outputURL
         self.audioMode = audioMode
         self.screenOrigin = screenOrigin
         self.cropRect = cropRect
+        self.windowID = windowID
         self.excludedBundleID = excludedBundleID
     }
 
     func start() async throws {
-        let content = try await SCShareableContent.current
-        guard let display = pickDisplay(from: content.displays) else {
+        let content = try await shareableContent()
+        let targetWindow = pickWindow(from: content.windows)
+        let display = targetWindow == nil ? pickDisplay(from: content.displays) : nil
+        if targetWindow == nil && display == nil {
             throw NSError(domain: "NativeRecorder", code: 1, userInfo: [NSLocalizedDescriptionKey: "没有找到可录制的屏幕。"])
         }
 
         let excludedApps = content.applications.filter { app in
             app.bundleIdentifier == excludedBundleID || app.applicationName == "零创 AI 智能转写"
         }
-        let filter = SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
+        let filter: SCContentFilter
+        if let targetWindow {
+            filter = SCContentFilter(desktopIndependentWindow: targetWindow)
+        } else if let display {
+            filter = SCContentFilter(display: display, excludingApplications: excludedApps, exceptingWindows: [])
+        } else {
+            throw NSError(domain: "NativeRecorder", code: 2, userInfo: [NSLocalizedDescriptionKey: "没有找到可录制的窗口或屏幕。"])
+        }
         let config = SCStreamConfiguration()
         if let cropRect {
             config.sourceRect = cropRect
             config.width = max(2, Int(cropRect.width))
             config.height = max(2, Int(cropRect.height))
+        } else if let targetWindow {
+            config.width = max(2, Int(targetWindow.frame.width))
+            config.height = max(2, Int(targetWindow.frame.height))
         } else {
-            config.width = Int(display.width)
-            config.height = Int(display.height)
+            config.width = Int(display!.width)
+            config.height = Int(display!.height)
         }
         config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
         config.pixelFormat = kCVPixelFormatType_32BGRA
@@ -110,11 +124,21 @@ final class NativeRecorder {
             "event": "captureStarted",
             "filePath": outputURL.path,
             "audioMode": audioMode,
-            "displayWidth": Int(display.width),
-            "displayHeight": Int(display.height),
+            "captureTarget": targetWindow == nil ? "display" : "window",
+            "displayWidth": display.map { Int($0.width) } ?? NSNull(),
+            "displayHeight": display.map { Int($0.height) } ?? NSNull(),
+            "windowID": targetWindow.map { Int($0.windowID) } ?? NSNull(),
+            "windowTitle": targetWindow?.title ?? NSNull(),
             "region": cropRect.map { ["x": Int($0.origin.x), "y": Int($0.origin.y), "width": Int($0.width), "height": Int($0.height)] } ?? NSNull(),
             "excludedApps": excludedApps.map { $0.applicationName }
         ])
+    }
+
+    private func shareableContent() async throws -> SCShareableContent {
+        if windowID != nil {
+            return try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        }
+        return try await SCShareableContent.current
     }
 
     private func pickDisplay(from displays: [SCDisplay]) -> SCDisplay? {
@@ -124,6 +148,13 @@ final class NativeRecorder {
         return displays.first { display in
             abs(display.frame.origin.x - screenOrigin.x) < 2 && abs(display.frame.origin.y - screenOrigin.y) < 2
         } ?? displays.first
+    }
+
+    private func pickWindow(from windows: [SCWindow]) -> SCWindow? {
+        guard let windowID else {
+            return nil
+        }
+        return windows.first { $0.windowID == windowID }
     }
 
     func stop() {
@@ -158,7 +189,7 @@ func emit(_ object: [String: Any]) {
 }
 
 func usage() -> Never {
-    fputs("Usage: native-recorder start <output.mp4> [system|microphone] [screenX screenY regionX regionY regionW regionH] [excludedBundleID]\n", stderr)
+    fputs("Usage: native-recorder start <output.mp4> [system|microphone] [--window-id <windowID> [excludedBundleID] | screenX screenY regionX regionY regionW regionH [excludedBundleID]]\n", stderr)
     exit(2)
 }
 
@@ -170,8 +201,17 @@ let audioMode = CommandLine.arguments.count >= 4 ? CommandLine.arguments[3] : "s
 guard ["system", "microphone"].contains(audioMode) else { usage() }
 var screenOrigin: CGPoint? = nil
 var cropRect: CGRect? = nil
+var windowID: UInt32? = nil
 var excludedBundleID: String? = nil
-if CommandLine.arguments.count >= 10 {
+if CommandLine.arguments.count >= 6 && CommandLine.arguments[4] == "--window-id" {
+    guard let parsedWindowID = UInt32(CommandLine.arguments[5]) else {
+        usage()
+    }
+    windowID = parsedWindowID
+    if CommandLine.arguments.count >= 7 {
+        excludedBundleID = CommandLine.arguments[6]
+    }
+} else if CommandLine.arguments.count >= 10 {
     guard
         let screenX = Double(CommandLine.arguments[4]),
         let screenY = Double(CommandLine.arguments[5]),
@@ -191,7 +231,7 @@ if CommandLine.arguments.count >= 10 {
     }
 }
 try? FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-let recorder = NativeRecorder(outputURL: outputURL, audioMode: audioMode, screenOrigin: screenOrigin, cropRect: cropRect, excludedBundleID: excludedBundleID)
+let recorder = NativeRecorder(outputURL: outputURL, audioMode: audioMode, screenOrigin: screenOrigin, cropRect: cropRect, windowID: windowID, excludedBundleID: excludedBundleID)
 
 Task {
     do {

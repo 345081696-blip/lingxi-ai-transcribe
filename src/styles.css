@@ -655,6 +655,68 @@ label.disabled,
   width: min(860px, calc(100vw - 48px));
 }
 
+.window-picker-dialog {
+  width: min(860px, calc(100vw - 48px));
+}
+
+.window-picker-list {
+  display: grid;
+  gap: 10px;
+}
+
+.window-picker-empty {
+  padding: 14px;
+  border: 1px dashed var(--line-bright);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.window-picker-item {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(13, 17, 23, 0.72);
+  text-align: left;
+}
+
+.window-picker-item:hover {
+  border-color: var(--cyan);
+  background: rgba(27, 38, 50, 0.9);
+}
+
+.window-picker-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.window-picker-meta {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.window-picker-meta strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.window-picker-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
 #statusLogContent {
   max-height: min(620px, calc(100vh - 170px));
 }
@@ -698,5 +760,9 @@ pre {
 
   .workflow-metrics {
     min-width: 0;
+  }
+
+  .window-picker-item {
+    grid-template-columns: 1fr;
   }
 }
