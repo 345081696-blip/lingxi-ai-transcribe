@@ -91,6 +91,10 @@ macOS 版当前已具备独立安装基础。Windows 版需要单独补齐 Windo
 
 详细开发过程见 `docs/DEVELOPMENT_PROCESS.md`。
 
+## 版本管理
+
+以后以 GitHub 为唯一源码源头。电脑版和手机版的版本规则、拉取方式、发布方式见 `docs/VERSION_MANAGEMENT.md`。
+
 ## 录屏声音说明
 
 macOS 上优先使用 ScreenCaptureKit 原生录屏。新版 macOS 的“屏幕与系统音频录制”权限可提供系统音频；如果录屏文件没有声音，优先到系统设置中授权本应用。导入已下载的视频/音频文件不受这个限制。
