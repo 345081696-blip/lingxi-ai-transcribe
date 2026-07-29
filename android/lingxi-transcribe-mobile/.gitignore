@@ -1,0 +1,14 @@
+.gradle/
+.idea/
+build/
+*/build/
+app/.cxx/
+local.properties
+*.iml
+*.aab
+captures/
+app/src/main/assets/models/*.gguf
+app/src/main/assets/models/*.tflite
+
+!app/src/main/assets/models/ggml-tiny.bin
+!releases/*.apk
