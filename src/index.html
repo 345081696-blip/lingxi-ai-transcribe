@@ -27,6 +27,82 @@
             </select>
           </label>
           <label>
+            <span>录制声音</span>
+            <div class="inline-control">
+              <select id="audioMode">
+                <option value="system">系统声音</option>
+                <option value="microphone">外部声音</option>
+              </select>
+              <button id="testAudioInput" type="button">检测声音</button>
+            </div>
+            <span id="audioCheckStatus" class="field-hint">系统声音建议在正式录制前先短录 5 秒确认；外部声音可直接检测麦克风。</span>
+          </label>
+          <label>
+            <span>录制范围</span>
+            <select id="captureMode">
+              <option value="region">框选范围</option>
+              <option value="screen">全屏录制</option>
+              <option value="window">锁定窗口</option>
+            </select>
+          </label>
+          <label>
+            <span>录制定时</span>
+            <div class="inline-control timer-control">
+              <select id="recordingDuration">
+                <option value="0">不限时</option>
+                <option value="300">5 分钟</option>
+                <option value="600">10 分钟</option>
+                <option value="1800">30 分钟</option>
+                <option value="3600">1 小时</option>
+                <option value="7200">2 小时</option>
+                <option value="custom">自定义</option>
+                <option value="calculated">按视频时长计算</option>
+              </select>
+              <input id="customDurationMinutes" type="text" inputmode="text" placeholder="00:00:00" disabled />
+            </div>
+            <div id="durationCalculator" class="duration-calculator" hidden>
+              <input id="sourceVideoDuration" type="text" inputmode="text" placeholder="视频时长，如 01:30 或 90 分钟" />
+              <select id="playbackSpeed">
+                <option value="1">1.0 倍</option>
+                <option value="1.25">1.25 倍</option>
+                <option value="1.5">1.5 倍</option>
+                <option value="1.75">1.75 倍</option>
+                <option value="2">2.0 倍</option>
+                <option value="3">3.0 倍</option>
+              </select>
+              <span id="durationHint">输入视频时长后自动计算录制时长。</span>
+            </div>
+          </label>
+          <label>
+            <span>结束缓冲</span>
+            <select id="recordingBufferSeconds">
+              <option value="5">多录 5 秒</option>
+              <option value="10">多录 10 秒</option>
+              <option value="30">多录 30 秒</option>
+              <option value="0">不加缓冲</option>
+            </select>
+          </label>
+          <label>
+            <span>专有词与错词修正</span>
+            <textarea id="glossaryText" rows="4" placeholder="每行一条：&#10;零创AI&#10;错误词=正确词&#10;OPC=OBC"></textarea>
+            <span class="field-hint">用于人名、品牌名、课程术语和常见错词修正，会写入处理报告。</span>
+          </label>
+          <label class="check-row">
+            <input id="autoTranscribe" type="checkbox" checked />
+            <span>录制停止后自动开始转录</span>
+          </label>
+          <label class="check-row">
+            <input id="promptForNames" type="checkbox" checked />
+            <span>完成后弹窗命名</span>
+          </label>
+          <label>
+            <span>重新转写保存方式</span>
+            <select id="rewriteMode">
+              <option value="keep">保留新版本</option>
+              <option value="overwrite">覆盖重新转写结果</option>
+            </select>
+          </label>
+          <label>
             <span>模型</span>
             <select id="model">
               <option value="small">small：平衡速度</option>
@@ -151,82 +227,6 @@
             </div>
             <span id="localAiStatus">未检测</span>
           </div>
-          <label>
-            <span>录制声音</span>
-            <div class="inline-control">
-              <select id="audioMode">
-                <option value="system">系统声音</option>
-                <option value="microphone">外部声音</option>
-              </select>
-              <button id="testAudioInput" type="button">检测声音</button>
-            </div>
-            <span id="audioCheckStatus" class="field-hint">系统声音建议在正式录制前先短录 5 秒确认；外部声音可直接检测麦克风。</span>
-          </label>
-          <label>
-            <span>录制范围</span>
-            <select id="captureMode">
-              <option value="region">框选范围</option>
-              <option value="screen">全屏录制</option>
-              <option value="window">锁定窗口</option>
-            </select>
-          </label>
-          <label>
-            <span>录制定时</span>
-            <div class="inline-control timer-control">
-              <select id="recordingDuration">
-                <option value="0">不限时</option>
-                <option value="300">5 分钟</option>
-                <option value="600">10 分钟</option>
-                <option value="1800">30 分钟</option>
-                <option value="3600">1 小时</option>
-                <option value="7200">2 小时</option>
-                <option value="custom">自定义</option>
-                <option value="calculated">按视频时长计算</option>
-              </select>
-              <input id="customDurationMinutes" type="text" inputmode="text" placeholder="00:00:00" disabled />
-            </div>
-            <div id="durationCalculator" class="duration-calculator" hidden>
-              <input id="sourceVideoDuration" type="text" inputmode="text" placeholder="视频时长，如 01:30 或 90 分钟" />
-              <select id="playbackSpeed">
-                <option value="1">1.0 倍</option>
-                <option value="1.25">1.25 倍</option>
-                <option value="1.5">1.5 倍</option>
-                <option value="1.75">1.75 倍</option>
-                <option value="2">2.0 倍</option>
-                <option value="3">3.0 倍</option>
-              </select>
-              <span id="durationHint">输入视频时长后自动计算录制时长。</span>
-            </div>
-          </label>
-          <label>
-            <span>结束缓冲</span>
-            <select id="recordingBufferSeconds">
-              <option value="5">多录 5 秒</option>
-              <option value="10">多录 10 秒</option>
-              <option value="30">多录 30 秒</option>
-              <option value="0">不加缓冲</option>
-            </select>
-          </label>
-          <label>
-            <span>专有词与错词修正</span>
-            <textarea id="glossaryText" rows="4" placeholder="每行一条：&#10;零创AI&#10;错误词=正确词&#10;OPC=OBC"></textarea>
-            <span class="field-hint">用于人名、品牌名、课程术语和常见错词修正，会写入处理报告。</span>
-          </label>
-          <label class="check-row">
-            <input id="autoTranscribe" type="checkbox" checked />
-            <span>录制停止后自动开始转录</span>
-          </label>
-          <label class="check-row">
-            <input id="promptForNames" type="checkbox" checked />
-            <span>完成后弹窗命名</span>
-          </label>
-          <label>
-            <span>重新转写保存方式</span>
-            <select id="rewriteMode">
-              <option value="keep">保留新版本</option>
-              <option value="overwrite">覆盖重新转写结果</option>
-            </select>
-          </label>
         </div>
         <div class="notice">
           <strong>两段式流程</strong>

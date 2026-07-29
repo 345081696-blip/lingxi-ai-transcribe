@@ -3,6 +3,7 @@ import ScreenCaptureKit
 import AVFoundation
 import CoreMedia
 import CoreGraphics
+import AppKit
 
 final class RecorderDelegate: NSObject, SCRecordingOutputDelegate {
     let onStart: () -> Void
@@ -50,8 +51,19 @@ final class NativeRecorder {
     }
 
     func start() async throws {
+        await MainActor.run {
+            _ = NSApplication.shared
+            NSApp.setActivationPolicy(.accessory)
+        }
         let content = try await shareableContent()
         let targetWindow = pickWindow(from: content.windows)
+        if windowID != nil && targetWindow == nil {
+            throw NSError(
+                domain: "NativeRecorder",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "没有找到已锁定窗口，请把目标窗口保持打开后重新选择。"]
+            )
+        }
         let display = targetWindow == nil ? pickDisplay(from: content.displays) : nil
         if targetWindow == nil && display == nil {
             throw NSError(domain: "NativeRecorder", code: 1, userInfo: [NSLocalizedDescriptionKey: "没有找到可录制的屏幕。"])

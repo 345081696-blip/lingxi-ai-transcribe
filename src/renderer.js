@@ -775,7 +775,7 @@ async function prepareCaptureFrame() {
     if (!selectedWindowCapture?.windowId) {
       throw new Error('请先选择要锁定的窗口。');
     }
-    await window.studio.recordingFrameCommand('passthrough');
+    await window.studio.hideRecordingFrame();
     return {
       mode: 'window',
       window: {
@@ -1486,7 +1486,11 @@ async function startNativeRecording(selectedAudioMode) {
   }
   try {
     await startNativeSegment(selectedAudioMode);
-    await window.studio.recordingFrameCommand('passthrough');
+    if (currentCapture?.mode === 'window') {
+      await window.studio.hideRecordingFrame();
+    } else {
+      await window.studio.recordingFrameCommand('passthrough');
+    }
     await window.studio.showRecordingWidget();
     updateRecordingButtons();
     await window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
@@ -1500,7 +1504,15 @@ async function startNativeRecording(selectedAudioMode) {
     nativeSegments = [];
     autoStopTriggered = false;
     stopAutoStopTimer();
-    framePrepared = true;
+    stopWidgetTimer();
+    if (currentCapture?.mode === 'window') {
+      resetCaptureFrameState();
+      selectedWindowCapture = null;
+      await window.studio.hideRecordingWidget();
+      await window.studio.hideRecordingFrame();
+    } else {
+      framePrepared = true;
+    }
     updateRecordingButtons();
     throw error;
   }
@@ -1751,7 +1763,11 @@ async function resumeActiveRecording() {
         logStatus('录制已继续。');
         scheduleAutoStop();
         updateRecordingButtons();
-        window.studio.recordingFrameCommand('passthrough');
+        if (currentCapture?.mode === 'window') {
+          window.studio.hideRecordingFrame();
+        } else {
+          window.studio.recordingFrameCommand('passthrough');
+        }
         window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
       })
       .catch((error) => {
