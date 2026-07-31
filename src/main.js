@@ -12,6 +12,7 @@ const outputRoot = path.join(app.getPath('documents'), 'TranscribeStudio');
 const productName = '零创AI 智能转写器';
 const appVersion = app.getVersion();
 const progressPrefix = '__LC_PROGRESS__';
+const mediaExtensions = new Set(['.mp4', '.mov', '.m4v', '.mkv', '.webm', '.avi', '.mp3', '.m4a', '.wav', '.aac', '.flac', '.ogg']);
 
 let mainWindow;
 let widgetWindow;
@@ -863,32 +864,46 @@ function organizerArgs(options = {}) {
   return args;
 }
 
-ipcMain.handle('choose-media', async () => {
+function isSupportedMediaPath(filePath) {
+  return mediaExtensions.has(path.extname(filePath || '').toLowerCase());
+}
+
+async function chooseMediaFiles({ title, defaultPath } = {}) {
   const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择短视频或音频',
+    title,
+    defaultPath,
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: '音视频文件', extensions: ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'mp3', 'm4a', 'wav', 'aac', 'flac', 'ogg'] },
-      { name: '所有文件', extensions: ['*'] }
+      { name: '所有文件', extensions: ['*'] },
+      { name: '音视频文件', extensions: ['mp4', 'MP4', 'mov', 'MOV', 'm4v', 'M4V', 'mkv', 'MKV', 'webm', 'WEBM', 'avi', 'AVI', 'mp3', 'MP3', 'm4a', 'M4A', 'wav', 'WAV', 'aac', 'AAC', 'flac', 'FLAC', 'ogg', 'OGG'] }
     ]
   });
   if (result.canceled) return [];
-  return result.filePaths;
+  const supported = result.filePaths.filter(isSupportedMediaPath);
+  const rejected = result.filePaths.length - supported.length;
+  if (rejected > 0) {
+    await dialog.showMessageBox(mainWindow, {
+      type: 'warning',
+      title: '文件格式不支持',
+      message: `已跳过 ${rejected} 个非音视频文件。`,
+      detail: '支持 MP4、MOV、M4V、MKV、WEBM、AVI、MP3、M4A、WAV、AAC、FLAC、OGG。'
+    });
+  }
+  return supported;
+}
+
+ipcMain.handle('choose-media', async () => {
+  return chooseMediaFiles({
+    title: '选择视频或音频'
+  });
 });
 
 ipcMain.handle('choose-recording-media', async () => {
   fs.mkdirSync(outputRoot, { recursive: true });
-  const result = await dialog.showOpenDialog(mainWindow, {
+  return chooseMediaFiles({
     title: '选择已录制的视频重新转写',
-    defaultPath: outputRoot,
-    properties: ['openFile', 'multiSelections'],
-    filters: [
-      { name: '录屏视频/音频', extensions: ['mp4', 'webm', 'mov', 'm4v', 'mkv', 'mp3', 'm4a', 'wav', 'aac', 'flac', 'ogg'] },
-      { name: '所有文件', extensions: ['*'] }
-    ]
+    defaultPath: outputRoot
   });
-  if (result.canceled) return [];
-  return result.filePaths;
 });
 
 ipcMain.handle('choose-openclaw-command', async () => {
