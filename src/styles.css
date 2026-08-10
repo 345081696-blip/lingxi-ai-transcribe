@@ -465,6 +465,13 @@ label.disabled,
     rgba(22, 31, 42, 0.82);
 }
 
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .jobs {
   display: grid;
   gap: 0;

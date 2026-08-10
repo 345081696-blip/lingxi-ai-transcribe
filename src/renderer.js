@@ -13,6 +13,7 @@ const closeHelp = document.querySelector('#closeHelp');
 const jobs = document.querySelector('#jobs');
 const statusBox = document.querySelector('#status');
 const openOutput = document.querySelector('#openOutput');
+const startQueuedJobs = document.querySelector('#startQueuedJobs');
 const version = document.querySelector('#version');
 const language = document.querySelector('#language');
 const model = document.querySelector('#model');
@@ -39,6 +40,8 @@ const workflowSummary = document.querySelector('#workflowSummary');
 const expectedFinish = document.querySelector('#expectedFinish');
 const audioSummary = document.querySelector('#audioSummary');
 const organizer = document.querySelector('#organizer');
+const organizeConcurrency = document.querySelector('#organizeConcurrency');
+const queueHint = document.querySelector('#queueHint');
 const localAiBaseUrl = document.querySelector('#localAiBaseUrl');
 const localAiModel = document.querySelector('#localAiModel');
 const localAiBaseUrlPresets = document.querySelector('#localAiBaseUrlPresets');
@@ -98,9 +101,10 @@ const LOCAL_AI_PRESETS_KEY = 'lingchuang-local-ai-presets-v1';
 const CLOUD_AI_PRESETS_KEY = 'lingchuang-cloud-ai-presets-v1';
 const CLOUD_AI_KEY_STORAGE = 'lingchuang-cloud-ai-api-key-v1';
 const GLOSSARY_STORAGE_KEY = 'lingchuang-glossary-v1';
+const ORGANIZE_CONCURRENCY_KEY = 'lingchuang-organize-concurrency-v1';
 
 const CLOUD_AI_PROVIDER_PRESETS = {
-  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
   deeprouter: { baseUrl: 'https://deeprouter.top', model: '' },
   siliconflow: { baseUrl: 'https://api.siliconflow.cn', model: 'deepseek-ai/DeepSeek-V3' },
   qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus' },
@@ -108,6 +112,11 @@ const CLOUD_AI_PROVIDER_PRESETS = {
   volcengine: { baseUrl: 'https://ark.cn-beijing.volces.com/api', model: '' },
   openai: { baseUrl: 'https://api.openai.com', model: 'gpt-4.1-mini' }
 };
+
+const CLOUD_AI_MODEL_PRESETS = [
+  'deepseek-v4-flash',
+  'deepseek-v4-pro'
+];
 
 const DOCUMENT_TEMPLATE_LABELS = {
   general: '通用整理',
@@ -145,6 +154,8 @@ let autoStopTimer = null;
 let autoStopTriggered = false;
 let adjustingPausedFrame = false;
 let namePromptQueue = Promise.resolve();
+let transcribeQueue = [];
+let activeTranscriptions = 0;
 let selectedWindowCapture = null;
 let pendingWindowCapture = null;
 
@@ -370,7 +381,7 @@ function renderCloudAiPresets() {
   const presetBaseUrls = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.baseUrl).filter(Boolean);
   const presetModels = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.model).filter(Boolean);
   const baseUrls = [...new Set([...presetBaseUrls, ...presets.map((item) => item.baseUrl).filter(Boolean)])];
-  const models = [...new Set([...presetModels, ...presets.map((item) => item.model).filter(Boolean)])];
+  const models = [...new Set([...CLOUD_AI_MODEL_PRESETS, ...presetModels, ...presets.map((item) => item.model).filter(Boolean)])];
   cloudAiBaseUrlPresets.innerHTML = baseUrls.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
   cloudAiModelPresets.innerHTML = models.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
   if (!cloudAiBaseUrl.value.trim() && baseUrls[0]) cloudAiBaseUrl.value = baseUrls[0];
@@ -890,6 +901,66 @@ function ensureJobsReady() {
   }
 }
 
+function selectedOrganizeConcurrency() {
+  const parsed = Number.parseInt(organizeConcurrency?.value || '2', 10);
+  if (Number.isNaN(parsed)) return 2;
+  return Math.min(5, Math.max(1, parsed));
+}
+
+function updateQueueHint() {
+  if (!queueHint) return;
+  const waiting = transcribeQueue.filter((row) => row.isConnected && row.dataset.queued === 'true').length;
+  queueHint.textContent = `当前并发 ${selectedOrganizeConcurrency()} 个；运行 ${activeTranscriptions} 个，排队 ${waiting} 个。`;
+}
+
+function removeFromTranscribeQueue(row) {
+  transcribeQueue = transcribeQueue.filter((item) => item !== row);
+  if (row?.dataset) row.dataset.queued = 'false';
+  updateQueueHint();
+}
+
+function pumpTranscribeQueue() {
+  updateQueueHint();
+  const limit = selectedOrganizeConcurrency();
+  while (activeTranscriptions < limit && transcribeQueue.length) {
+    const row = transcribeQueue.shift();
+    if (!row?.isConnected || row.dataset.queued !== 'true' || row.dataset.running === 'true') continue;
+    row.dataset.queued = 'false';
+    activeTranscriptions += 1;
+    updateQueueHint();
+    runTranscription(row).finally(() => {
+      activeTranscriptions = Math.max(0, activeTranscriptions - 1);
+      updateQueueHint();
+      pumpTranscribeQueue();
+    });
+  }
+}
+
+function enqueueTranscription(row) {
+  if (!row || row.dataset.running === 'true' || row.dataset.queued === 'true') return;
+  row.dataset.queued = 'true';
+  setJobState(row, '', '排队中');
+  updateJobProgress(row, { percent: 0, message: '等待空闲整理名额...' });
+  appendJobLog(row, `已加入无人值守队列；当前并发上限：${selectedOrganizeConcurrency()}。`);
+  const startButton = row.querySelector('.start-transcribe');
+  if (startButton) startButton.hidden = true;
+  transcribeQueue.push(row);
+  pumpTranscribeQueue();
+}
+
+function startWaitingJobs() {
+  const rows = [...jobs.querySelectorAll('.job')].reverse();
+  let count = 0;
+  for (const row of rows) {
+    if (row.dataset.running === 'true' || row.dataset.queued === 'true') continue;
+    const badgeText = row.querySelector('.badge')?.textContent || '';
+    if (badgeText === '完成' || badgeText === '处理中' || badgeText === '生成中') continue;
+    enqueueTranscription(row);
+    count += 1;
+  }
+  logStatus(count ? `已将 ${count} 个任务加入排队处理。` : '没有可加入队列的待处理任务。');
+}
+
 function defaultNameFromPath(filePath) {
   return fileName(filePath).replace(/\.[^.]+$/, '');
 }
@@ -1015,7 +1086,7 @@ function createJob(filePath, options = {}) {
       <button class="delete-job danger">删除任务</button>
     </div>
   `;
-  row.querySelector('.start-transcribe').addEventListener('click', () => runTranscription(row));
+  row.querySelector('.start-transcribe').addEventListener('click', () => enqueueTranscription(row));
   row.querySelector('.stop-transcribe').addEventListener('click', () => stopTranscription(row));
   row.querySelector('.copy-job-log').addEventListener('click', async () => {
     await window.studio.copyText(row.querySelector('.job-log')?.textContent || '');
@@ -1049,6 +1120,7 @@ function deleteJob(row) {
     appendJobLog(row, '任务正在转写中，请先停止转录再删除任务。');
     return;
   }
+  removeFromTranscribeQueue(row);
   row.remove();
   updateJobsEmptyState();
 }
@@ -1176,11 +1248,15 @@ async function runTranscription(row) {
   const startButton = row.querySelector('.start-transcribe');
   const stopButton = row.querySelector('.stop-transcribe');
   row.dataset.running = 'true';
+  row.dataset.queued = 'false';
   setJobState(row, '', '处理中');
   updateJobProgress(row, { percent: 2, message: '准备处理...' });
   appendJobLog(row, '抽取音频、AI 转写并整理文档...');
   if (startButton) startButton.hidden = true;
-  if (stopButton) stopButton.hidden = false;
+  if (stopButton) {
+    stopButton.disabled = false;
+    stopButton.hidden = false;
+  }
   rememberCurrentLocalAiPreset();
   rememberCurrentCloudAiPreset();
   try {
@@ -1220,6 +1296,8 @@ async function runTranscription(row) {
     if (stopButton) stopButton.hidden = true;
   } finally {
     row.dataset.running = 'false';
+    row.dataset.queued = 'false';
+    updateQueueHint();
   }
 }
 
@@ -1231,7 +1309,7 @@ async function stopTranscription(row) {
 
 function queueTranscription(filePath, shouldStart = true, options = {}) {
   const row = createJob(filePath, options);
-  if (shouldStart) runTranscription(row);
+  if (shouldStart) enqueueTranscription(row);
   else {
     setJobState(row, '', '待转录');
     appendJobLog(row, '录制文件已保存。需要时可点击“开始转录”。');
@@ -1886,6 +1964,12 @@ copyRuntimeDiagnostics.addEventListener('click', async () => {
 });
 
 organizer.addEventListener('change', updateOrganizerFields);
+organizeConcurrency.addEventListener('change', () => {
+  localStorage.setItem(ORGANIZE_CONCURRENCY_KEY, String(selectedOrganizeConcurrency()));
+  updateQueueHint();
+  pumpTranscribeQueue();
+});
+startQueuedJobs.addEventListener('click', startWaitingJobs);
 cloudAiProvider.addEventListener('change', applyCloudAiProviderPreset);
 model.addEventListener('change', updateWorkflowSummary);
 style.addEventListener('change', updateWorkflowSummary);
@@ -1967,8 +2051,10 @@ cancelWindowPicker.addEventListener('click', () => {
 updateOrganizerFields();
 renderLocalAiPresets();
 renderCloudAiPresets();
+organizeConcurrency.value = localStorage.getItem(ORGANIZE_CONCURRENCY_KEY) || organizeConcurrency.value || '2';
 glossaryText.value = localStorage.getItem(GLOSSARY_STORAGE_KEY) || '';
 updateWorkflowSummary();
+updateQueueHint();
 
 window.studio.onJobLog((payload) => {
   if (payload.message) logStatus(payload.message);

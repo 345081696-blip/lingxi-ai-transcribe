@@ -155,6 +155,17 @@
               <option value="cloudai">云端大模型 API</option>
             </select>
           </label>
+          <label>
+            <span>同时整理任务</span>
+            <select id="organizeConcurrency">
+              <option value="1">1 个：最稳</option>
+              <option value="2" selected>2 个：推荐</option>
+              <option value="3">3 个：较快</option>
+              <option value="4">4 个：激进</option>
+              <option value="5">5 个：满负荷</option>
+            </select>
+            <span id="queueHint" class="field-hint">批量任务会按此数量同时处理，其余自动排队等待，无需值守。</span>
+          </label>
           <label class="cloudai-field">
             <span>云端服务商</span>
             <select id="cloudAiProvider">
@@ -175,7 +186,7 @@
           </label>
           <label class="cloudai-field">
             <span>云端模型名称</span>
-            <input id="cloudAiModel" list="cloudAiModelPresets" placeholder="例如 deepseek-chat、qwen-plus、gpt-4.1-mini" />
+            <input id="cloudAiModel" list="cloudAiModelPresets" placeholder="例如 deepseek-v4-flash、qwen-plus、gpt-4.1-mini" />
             <datalist id="cloudAiModelPresets"></datalist>
           </label>
           <label class="cloudai-field">
@@ -265,7 +276,10 @@
         <section class="panel">
           <div class="panel-head">
             <h2>任务</h2>
-            <button id="openOutput">打开输出目录</button>
+            <div class="panel-actions">
+              <button id="startQueuedJobs" type="button">开始排队</button>
+              <button id="openOutput">打开输出目录</button>
+            </div>
           </div>
           <div id="jobs" class="jobs empty">暂无任务</div>
         </section>
@@ -278,7 +292,7 @@
           <pre id="status">正在检查本机环境...</pre>
         </section>
       </section>
-      <div id="version" class="version">v0.2.25</div>
+      <div id="version" class="version">v0.2.29</div>
     </main>
     <dialog id="helpDialog" class="help-dialog">
       <div class="help-card">
@@ -304,6 +318,7 @@
           <p>识别语言默认自动判断。base 更快，small 平衡速度和准确率，medium 更准但更慢；倍速较高或内容重要时，建议优先使用 small 或 medium。</p>
           <h3>智能整理</h3>
           <p>智能整理有四种模式。本机规则整理不需要额外模型，任何电脑都能用。云端大模型 API 适合长内容整理，填写兼容 OpenAI 的 API 地址、模型名称和 API Key 后点击测试模型，成功后再转写。</p>
+          <p>批量长视频可设置“同时整理任务”为 1-5 个。点击“开始排队”后，软件只会同时处理指定数量，其余任务自动等待，适合睡前无人值守。</p>
           <p>云端服务商可以先选预设，软件会自动填入常用 API 地址和模型示例；第三方中转平台请选择“自定义”或对应平台，然后以平台后台显示的 Base URL 与模型 ID 为准。检测失败但测试模型成功，也可以正常使用。</p>
           <h3>文档模板</h3>
           <p>文档模板会影响最终整理稿结构。直播复盘适合提取核心观点、案例、问答和成交话术；课程笔记适合沉淀知识框架；素材提取适合剪辑和短视频选题。转写完成后可点击“换模板生成”，复用已有逐字稿重新整理，不会重新跑 Whisper。</p>
