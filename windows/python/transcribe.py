@@ -87,13 +87,30 @@ def extract_audio(ffmpeg, input_path, output_path):
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 
+def resolve_model_ref(model_name):
+    # 若安装包自带了本地模型目录（python/models/<name>），优先用本地，离线可用；
+    # 否则返回原始名称，交由 faster-whisper 联网下载。
+    local = Path(__file__).resolve().parent / "models" / model_name
+    if local.is_dir() and any(local.iterdir()):
+        return str(local), True
+    return model_name, False
+
+
 def load_engine(model_name, language):
+    model_ref, is_local = resolve_model_ref(model_name)
     try:
         from faster_whisper import WhisperModel
 
         def run(audio_path):
-            emit(f"使用 faster-whisper 模型：{model_name}")
-            model = WhisperModel(model_name, device="auto", compute_type="auto")
+            emit(f"使用 faster-whisper 模型：{model_ref}" + ("（本地自带）" if is_local else ""))
+            try:
+                model = WhisperModel(model_ref, device="auto", compute_type="auto")
+            except Exception as local_err:
+                if is_local:
+                    emit(f"本地模型加载失败（{local_err}），改联网下载：{model_name}")
+                    model = WhisperModel(model_name, device="auto", compute_type="auto")
+                else:
+                    raise
             kwargs = {"vad_filter": True}
             if language and language != "auto":
                 kwargs["language"] = language

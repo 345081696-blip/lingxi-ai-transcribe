@@ -33,6 +33,22 @@ python3 -m pip install openai-whisper python-docx
 
 还需要本机有 `ffmpeg`。当前机器已检测到 `/opt/homebrew/bin/ffmpeg`。
 
+## 转写模型（离线自带 + 联网下载）
+
+转写使用 faster-whisper，默认模型 `small`。安装包**已自带** `small` 模型（`python/models/small/`，由构建脚本 `scripts/fetch_models.py` 拉取），首次使用**无需联网**即可离线转写。
+
+行为规则（`transcribe.py` 的 `resolve_model_ref` / `load_engine`）：
+
+- 若 `python/models/<名称>/` 目录存在且非空 → 优先加载本地模型（离线）。
+- 若本地不存在（例如界面选了 `base` / `medium` / `large` 等未自带的尺寸）→ 回退为从 HuggingFace 联网下载，下载后缓存到本机，之后离线可用。
+
+重新拉取/补充模型（需联网）：
+
+```bash
+npm run fetch:models                      # 拉取默认 small
+python3 scripts/fetch_models.py base medium   # 自定义尺寸
+```
+
 ## 开发运行
 
 ```bash
@@ -42,8 +58,16 @@ npm start
 
 ## 打包
 
+macOS：
+
 ```bash
 npm run dist
+```
+
+Windows（NSIS 安装包，构建前自动拉取 small 模型并打进安装包）：
+
+```bash
+npm run dist:win
 ```
 
 打包产物会输出到当前 Codex 任务的 `outputs/release` 目录。

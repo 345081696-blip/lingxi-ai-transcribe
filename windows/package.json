@@ -9,7 +9,9 @@
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --mac dir",
-    "dist": "electron-builder --mac dmg"
+    "dist": "electron-builder --mac dmg",
+    "fetch:models": "python3 scripts/fetch_models.py small",
+    "dist:win": "python3 scripts/fetch_models.py small && electron-builder --win nsis"
   },
   "dependencies": {},
   "devDependencies": {
@@ -25,7 +27,6 @@
     "files": [
       "src/**/*",
       "native/bin/native-recorder",
-      "python/**/*",
       "package.json"
     ],
     "extraResources": [

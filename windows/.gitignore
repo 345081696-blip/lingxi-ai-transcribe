@@ -20,3 +20,6 @@ Thumbs.db
 
 # 安装包（作为 GitHub Release 上传，不入库）
 *.exe
+
+# 转写模型权重（构建时由 scripts/fetch_models.py 拉取或本地放入，体积大，不入库）
+python/models/
