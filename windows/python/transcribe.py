@@ -28,11 +28,20 @@ def find_ffmpeg():
         "/opt/homebrew/bin/ffmpeg",
         "/usr/local/bin/ffmpeg",
         shutil.which("ffmpeg"),
+        shutil.which("ffmpeg.exe"),
     ]
     for candidate in candidates:
         if candidate and Path(candidate).exists():
             return candidate
-    raise RuntimeError("未找到 ffmpeg。请先安装 Homebrew ffmpeg，或设置 TRANSCRIBE_STUDIO_FFMPEG。")
+    # 兜底：使用 venv 内的 imageio-ffmpeg 二进制（Windows 无需单独安装 ffmpeg）
+    try:
+        import imageio_ffmpeg
+        exe = imageio_ffmpeg.get_ffmpeg_exe()
+        if exe and Path(exe).exists():
+            return exe
+    except Exception:
+        pass
+    raise RuntimeError("未找到 ffmpeg。请在 venv 中执行 pip install imageio-ffmpeg，或直接安装 ffmpeg 并设置 TRANSCRIBE_STUDIO_FFMPEG。")
 
 
 def find_ffprobe(ffmpeg):
@@ -40,13 +49,25 @@ def find_ffprobe(ffmpeg):
     candidates = [
         env_path,
         str(Path(ffmpeg).with_name("ffprobe")) if ffmpeg else None,
+        str(Path(ffmpeg).with_name("ffprobe.exe")) if ffmpeg else None,
         "/opt/homebrew/bin/ffprobe",
         "/usr/local/bin/ffprobe",
+        "/usr/bin/ffprobe",
         shutil.which("ffprobe"),
+        shutil.which("ffprobe.exe"),
     ]
     for candidate in candidates:
         if candidate and Path(candidate).exists():
             return candidate
+    # imageio-ffmpeg 目录自带 ffprobe
+    try:
+        import imageio_ffmpeg
+        base = Path(imageio_ffmpeg.get_ffmpeg_exe())
+        probe = base.with_name("ffprobe" + base.suffix)
+        if probe.exists():
+            return str(probe)
+    except Exception:
+        pass
     raise RuntimeError("未找到 ffprobe。请确认 ffmpeg 安装完整。")
 
 

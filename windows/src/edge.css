@@ -1,0 +1,36 @@
+html,
+body,
+.edge {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.edge {
+  background: rgba(255, 45, 45, 0.42);
+  box-shadow: 0 0 4px rgba(255, 45, 45, 0.16);
+}
+
+.edge.recording {
+  animation: edgePulse 1.2s steps(2, end) infinite;
+}
+
+.edge.paused {
+  animation: none;
+  background: rgba(255, 204, 0, 0.52);
+  box-shadow: 0 0 4px rgba(255, 204, 0, 0.18);
+}
+
+@keyframes edgePulse {
+  0% {
+    background: rgba(255, 45, 45, 0.38);
+  }
+  50% {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  100% {
+    background: rgba(255, 45, 45, 0.38);
+  }
+}

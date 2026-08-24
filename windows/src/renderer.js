@@ -1,12 +1,131 @@
 const pickMedia = document.querySelector('#pickMedia');
+const rewriteMedia = document.querySelector('#rewriteMedia');
 const loadSources = document.querySelector('#loadSources');
+const copyRuntimeDiagnostics = document.querySelector('#copyRuntimeDiagnostics');
+const pauseRecording = document.querySelector('#pauseRecording');
+const adjustRecordingFrame = document.querySelector('#adjustRecordingFrame');
+const resumeRecording = document.querySelector('#resumeRecording');
 const stopRecording = document.querySelector('#stopRecording');
+const showHelp = document.querySelector('#showHelp');
+const showStatusLog = document.querySelector('#showStatusLog');
+const helpDialog = document.querySelector('#helpDialog');
+const closeHelp = document.querySelector('#closeHelp');
 const jobs = document.querySelector('#jobs');
 const statusBox = document.querySelector('#status');
 const openOutput = document.querySelector('#openOutput');
+const startQueuedJobs = document.querySelector('#startQueuedJobs');
+const version = document.querySelector('#version');
 const language = document.querySelector('#language');
 const model = document.querySelector('#model');
 const style = document.querySelector('#style');
+const documentTemplate = document.querySelector('#documentTemplate');
+const modelHint = document.querySelector('#modelHint');
+const subtitleMode = document.querySelector('#subtitleMode');
+const dedupeMode = document.querySelector('#dedupeMode');
+const dedupeHint = document.querySelector('#dedupeHint');
+const audioMode = document.querySelector('#audioMode');
+const testAudioInput = document.querySelector('#testAudioInput');
+const audioCheckStatus = document.querySelector('#audioCheckStatus');
+const captureMode = document.querySelector('#captureMode');
+const recordingDuration = document.querySelector('#recordingDuration');
+const customDurationMinutes = document.querySelector('#customDurationMinutes');
+const durationCalculator = document.querySelector('#durationCalculator');
+const sourceVideoDuration = document.querySelector('#sourceVideoDuration');
+const playbackSpeed = document.querySelector('#playbackSpeed');
+const durationHint = document.querySelector('#durationHint');
+const recordingBufferSeconds = document.querySelector('#recordingBufferSeconds');
+const glossaryText = document.querySelector('#glossaryText');
+const workflowTitle = document.querySelector('#workflowTitle');
+const workflowSummary = document.querySelector('#workflowSummary');
+const expectedFinish = document.querySelector('#expectedFinish');
+const audioSummary = document.querySelector('#audioSummary');
+const organizer = document.querySelector('#organizer');
+const organizeConcurrency = document.querySelector('#organizeConcurrency');
+const queueHint = document.querySelector('#queueHint');
+const localAiBaseUrl = document.querySelector('#localAiBaseUrl');
+const localAiModel = document.querySelector('#localAiModel');
+const localAiBaseUrlPresets = document.querySelector('#localAiBaseUrlPresets');
+const localAiModelPresets = document.querySelector('#localAiModelPresets');
+const cloudAiBaseUrl = document.querySelector('#cloudAiBaseUrl');
+const cloudAiModel = document.querySelector('#cloudAiModel');
+const cloudAiApiKey = document.querySelector('#cloudAiApiKey');
+const cloudAiProvider = document.querySelector('#cloudAiProvider');
+const cloudAiBaseUrlPresets = document.querySelector('#cloudAiBaseUrlPresets');
+const cloudAiModelPresets = document.querySelector('#cloudAiModelPresets');
+const openclawModel = document.querySelector('#openclawModel');
+const openclawCommand = document.querySelector('#openclawCommand');
+const chooseOpenClawCommand = document.querySelector('#chooseOpenClawCommand');
+const checkOpenClaw = document.querySelector('#checkOpenClaw');
+const testOpenClaw = document.querySelector('#testOpenClaw');
+const copyDiagnostics = document.querySelector('#copyDiagnostics');
+const openclawStatus = document.querySelector('#openclawStatus');
+const checkLocalAi = document.querySelector('#checkLocalAi');
+const testLocalAi = document.querySelector('#testLocalAi');
+const copyLocalAiDiagnostics = document.querySelector('#copyLocalAiDiagnostics');
+const localAiStatus = document.querySelector('#localAiStatus');
+const checkCloudAi = document.querySelector('#checkCloudAi');
+const testCloudAi = document.querySelector('#testCloudAi');
+const copyCloudAiDiagnostics = document.querySelector('#copyCloudAiDiagnostics');
+const cloudAiStatus = document.querySelector('#cloudAiStatus');
+const autoTranscribe = document.querySelector('#autoTranscribe');
+const promptForNames = document.querySelector('#promptForNames');
+const rewriteMode = document.querySelector('#rewriteMode');
+const nameDialog = document.querySelector('#nameDialog');
+const nameDialogTitle = document.querySelector('#nameDialogTitle');
+const nameDialogText = document.querySelector('#nameDialogText');
+const nameDialogInput = document.querySelector('#nameDialogInput');
+const nameCancel = document.querySelector('#nameCancel');
+const nameConfirm = document.querySelector('#nameConfirm');
+const statusLogDialog = document.querySelector('#statusLogDialog');
+const statusLogContent = document.querySelector('#statusLogContent');
+const closeStatusLog = document.querySelector('#closeStatusLog');
+const copyStatusLog = document.querySelector('#copyStatusLog');
+const clearStatusLog = document.querySelector('#clearStatusLog');
+const windowPickerDialog = document.querySelector('#windowPickerDialog');
+const windowPickerHint = document.querySelector('#windowPickerHint');
+const windowPickerList = document.querySelector('#windowPickerList');
+const refreshWindowPicker = document.querySelector('#refreshWindowPicker');
+const cancelWindowPicker = document.querySelector('#cancelWindowPicker');
+const organizerWarningDialog = document.querySelector('#organizerWarningDialog');
+const organizerWarningText = document.querySelector('#organizerWarningText');
+const closeOrganizerWarning = document.querySelector('#closeOrganizerWarning');
+const retryOrganizerWarning = document.querySelector('#retryOrganizerWarning');
+const keepOrganizerWarning = document.querySelector('#keepOrganizerWarning');
+const templateDialog = document.querySelector('#templateDialog');
+const templateGenerateSelect = document.querySelector('#templateGenerateSelect');
+const cancelTemplateGenerate = document.querySelector('#cancelTemplateGenerate');
+const confirmTemplateGenerate = document.querySelector('#confirmTemplateGenerate');
+
+const STATUS_LOG_KEY = 'lingchuang-status-log-v1';
+const LOCAL_AI_PRESETS_KEY = 'lingchuang-local-ai-presets-v1';
+const CLOUD_AI_PRESETS_KEY = 'lingchuang-cloud-ai-presets-v1';
+const CLOUD_AI_KEY_STORAGE = 'lingchuang-cloud-ai-api-key-v1';
+const GLOSSARY_STORAGE_KEY = 'lingchuang-glossary-v1';
+const ORGANIZE_CONCURRENCY_KEY = 'lingchuang-organize-concurrency-v1';
+
+const CLOUD_AI_PROVIDER_PRESETS = {
+  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
+  deeprouter: { baseUrl: 'https://deeprouter.top', model: '' },
+  siliconflow: { baseUrl: 'https://api.siliconflow.cn', model: 'deepseek-ai/DeepSeek-V3' },
+  qwen: { baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode', model: 'qwen-plus' },
+  moonshot: { baseUrl: 'https://api.moonshot.cn', model: 'moonshot-v1-8k' },
+  volcengine: { baseUrl: 'https://ark.cn-beijing.volces.com/api', model: '' },
+  openai: { baseUrl: 'https://api.openai.com', model: 'gpt-4.1-mini' }
+};
+
+const CLOUD_AI_MODEL_PRESETS = [
+  'deepseek-v4-flash',
+  'deepseek-v4-pro'
+];
+
+const DOCUMENT_TEMPLATE_LABELS = {
+  general: '通用整理',
+  live_recap: '直播复盘',
+  course_notes: '课程笔记',
+  material_extract: '素材提取',
+  sales_script: '成交话术',
+  quotes: '金句提取'
+};
 
 let mediaRecorder = null;
 let outputRoot = null;
@@ -19,19 +138,765 @@ let widgetTimer = null;
 let pendingChunkWrites = [];
 let recordingBackend = null;
 let nativeRecordingFile = null;
+let currentAudioLabel = '';
+let currentCapture = null;
+let lastCaptureSize = null;
+let displayInfo = [];
+let framePrepared = false;
+let nativePaused = false;
+let nativeStopIntent = 'stop';
+let nativeSegments = [];
+let nativeAudioMode = 'system';
+let lastOpenClawInfo = null;
+let lastLocalAiInfo = null;
+let lastCloudAiInfo = null;
+let recordingLimitSeconds = 0;
+let autoStopTimer = null;
+let autoStopTriggered = false;
+let adjustingPausedFrame = false;
+let namePromptQueue = Promise.resolve();
+let transcribeQueue = [];
+let activeTranscriptions = 0;
+let selectedWindowCapture = null;
+let pendingWindowCapture = null;
 
 function logStatus(text) {
   const current = statusBox.textContent.trim();
   statusBox.textContent = current ? `${current}\n${text}` : text;
   statusBox.scrollTop = statusBox.scrollHeight;
+  persistStatusLog(text);
 }
 
-function jobOptions() {
+function persistStatusLog(text) {
+  const line = `[${new Date().toLocaleString('zh-CN', { hour12: false })}] ${text}`;
+  const previous = loadStatusLog().split('\n').filter(Boolean);
+  previous.push(line);
+  const trimmed = previous.slice(-2000).join('\n');
+  localStorage.setItem(STATUS_LOG_KEY, trimmed);
+}
+
+function loadStatusLog() {
+  return localStorage.getItem(STATUS_LOG_KEY) || '';
+}
+
+function renderStatusLogDialog() {
+  statusLogContent.textContent = loadStatusLog() || '暂无历史日志。';
+  statusLogDialog.showModal();
+}
+
+function jobOptions(extra = {}) {
   return {
     language: language.value,
     model: model.value,
-    style: style.value
+    style: style.value,
+    documentTemplate: documentTemplate.value,
+    glossaryText: glossaryText.value.trim(),
+    subtitleMode: subtitleMode.value,
+    dedupeMode: dedupeMode.value,
+    organizer: organizer.value,
+    openclawModel: openclawModel.value.trim(),
+    openclawCommand: openclawCommand.value.trim(),
+    localAiBaseUrl: localAiBaseUrl.value.trim(),
+    localAiModel: localAiModel.value.trim(),
+    cloudAiBaseUrl: cloudAiBaseUrl.value.trim(),
+    cloudAiModel: cloudAiModel.value.trim(),
+    cloudAiApiKey: cloudAiApiKey.value.trim(),
+    ...extra
   };
+}
+
+function updateOrganizerFields() {
+  const openclawEnabled = organizer.value === 'openclaw';
+  const localAiEnabled = organizer.value === 'localai';
+  const cloudAiEnabled = organizer.value === 'cloudai';
+  openclawModel.disabled = !openclawEnabled;
+  openclawCommand.disabled = !openclawEnabled;
+  chooseOpenClawCommand.disabled = !openclawEnabled;
+  document.querySelectorAll('.openclaw-field').forEach((item) => item.classList.toggle('disabled', !openclawEnabled));
+  checkOpenClaw.disabled = !openclawEnabled;
+  testOpenClaw.disabled = !openclawEnabled;
+  copyDiagnostics.disabled = !openclawEnabled;
+
+  localAiBaseUrl.disabled = !localAiEnabled;
+  localAiModel.disabled = !localAiEnabled;
+  document.querySelectorAll('.localai-field').forEach((item) => item.classList.toggle('disabled', !localAiEnabled));
+  checkLocalAi.disabled = !localAiEnabled;
+  testLocalAi.disabled = !localAiEnabled;
+  copyLocalAiDiagnostics.disabled = !localAiEnabled;
+
+  cloudAiBaseUrl.disabled = !cloudAiEnabled;
+  cloudAiModel.disabled = !cloudAiEnabled;
+  cloudAiApiKey.disabled = !cloudAiEnabled;
+  cloudAiProvider.disabled = !cloudAiEnabled;
+  document.querySelectorAll('.cloudai-field').forEach((item) => item.classList.toggle('disabled', !cloudAiEnabled));
+  checkCloudAi.disabled = !cloudAiEnabled;
+  testCloudAi.disabled = !cloudAiEnabled;
+  copyCloudAiDiagnostics.disabled = !cloudAiEnabled;
+}
+
+function renderOpenClawStatus(info) {
+  lastOpenClawInfo = info;
+  const box = checkOpenClaw.closest('.openclaw-status');
+  box?.classList.toggle('ready', Boolean(info.available));
+  box?.classList.toggle('error', !info.available);
+  const localModel = info.localModels?.[0]?.id || '';
+  const offlineAgent = (info.agents || []).find((agent) => agent.name === '小离') || null;
+  const modelHint = localModel
+    ? `本地模型：${localModel}`
+    : (offlineAgent?.model ? `小离模型：${offlineAgent.model}` : '');
+  openclawStatus.textContent = info.available
+    ? `${info.version || 'OpenClaw'} 已连接；默认：${info.defaultModel || 'OpenClaw 默认'}${modelHint ? `；${modelHint}` : ''}`
+    : (info.message || 'OpenClaw 不可用，将使用本机规则整理。');
+}
+
+function renderLocalAiStatus(info) {
+  lastLocalAiInfo = info;
+  const box = checkLocalAi.closest('.openclaw-status');
+  box?.classList.toggle('ready', Boolean(info.available));
+  box?.classList.toggle('error', !info.available);
+  const modelHint = info.selectedModel || info.models?.[0]?.id || '';
+  localAiStatus.textContent = info.available
+    ? `本地模型服务已连接：${info.baseUrl}${modelHint ? `；模型：${modelHint}` : ''}`
+    : (info.message || '本地大模型不可用，将使用本机规则整理。');
+  if (!localAiBaseUrl.value.trim() && info.baseUrl) localAiBaseUrl.value = info.baseUrl;
+  if (!localAiModel.value.trim() && modelHint) localAiModel.value = modelHint;
+}
+
+function renderCloudAiStatus(info) {
+  lastCloudAiInfo = info;
+  const box = checkCloudAi.closest('.openclaw-status');
+  box?.classList.toggle('ready', Boolean(info.available));
+  box?.classList.toggle('error', !info.available);
+  const modelHint = info.selectedModel || info.models?.[0]?.id || '';
+  cloudAiStatus.textContent = info.available
+    ? `云端 API 已连接：${info.baseUrl}${modelHint ? `；模型：${modelHint}` : ''}`
+    : (info.message || '云端 API 不可用，将使用本机规则整理。');
+  if (!cloudAiBaseUrl.value.trim() && info.baseUrl) cloudAiBaseUrl.value = info.baseUrl;
+  if (!cloudAiModel.value.trim() && modelHint) cloudAiModel.value = modelHint;
+}
+
+function friendlyAiError(message) {
+  const text = String(message || '');
+  if (/model_not_found|No available channel|model .*not found|模型名称不可用|模型不存在/i.test(text)) {
+    return '连接成功，但模型名称不可用。请到服务商后台复制可用模型 ID，或换一个模型后再试。';
+  }
+  if (/401|unauthorized|invalid api key|invalid_token|API Key 无效/i.test(text)) {
+    return 'API Key 无效、已过期或没有正确填写。请重新复制服务商后台的 Key。';
+  }
+  if (/403|forbidden|无权限|没有权限/i.test(text)) {
+    return 'API Key 没有权限访问该模型，或账号未开通该模型。';
+  }
+  if (/429|rate limit|quota|额度|余额/i.test(text)) {
+    return '额度不足或请求过于频繁。请检查余额、套餐或稍后再试。';
+  }
+  if (/503|502|504|没有可用通道|服务商当前没有可用通道/i.test(text)) {
+    return '服务商当前没有可用通道。请换模型、换线路或稍后再试。';
+  }
+  if (/ENOTFOUND|ECONNREFUSED|ECONNRESET|timed out|timeout|网络或 API 地址不可用/i.test(text)) {
+    return '网络或 API 地址不可用。请检查 Base URL 是否正确，或确认当前网络能访问该服务。';
+  }
+  return text;
+}
+
+function openClawOptions() {
+  return {
+    command: openclawCommand.value.trim(),
+    model: openclawModel.value.trim()
+  };
+}
+
+function localAiOptions() {
+  return {
+    baseUrl: localAiBaseUrl.value.trim(),
+    model: localAiModel.value.trim()
+  };
+}
+
+function cloudAiOptions() {
+  return {
+    baseUrl: cloudAiBaseUrl.value.trim(),
+    model: cloudAiModel.value.trim(),
+    apiKey: cloudAiApiKey.value.trim()
+  };
+}
+
+function loadLocalAiPresets() {
+  try {
+    const value = JSON.parse(localStorage.getItem(LOCAL_AI_PRESETS_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalAiPreset(baseUrl, model) {
+  const normalizedBaseUrl = String(baseUrl || '').trim();
+  const normalizedModel = String(model || '').trim();
+  if (!normalizedBaseUrl && !normalizedModel) return;
+  const presets = loadLocalAiPresets().filter((item) => (
+    item.baseUrl !== normalizedBaseUrl || item.model !== normalizedModel
+  ));
+  presets.unshift({ baseUrl: normalizedBaseUrl, model: normalizedModel, updatedAt: Date.now() });
+  localStorage.setItem(LOCAL_AI_PRESETS_KEY, JSON.stringify(presets.slice(0, 20)));
+  renderLocalAiPresets();
+}
+
+function renderLocalAiPresets() {
+  const presets = loadLocalAiPresets();
+  const baseUrls = [...new Set(presets.map((item) => item.baseUrl).filter(Boolean))];
+  const models = [...new Set(presets.map((item) => item.model).filter(Boolean))];
+  localAiBaseUrlPresets.innerHTML = baseUrls.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  localAiModelPresets.innerHTML = models.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  if (!localAiBaseUrl.value.trim() && baseUrls[0]) localAiBaseUrl.value = baseUrls[0];
+  if (!localAiModel.value.trim() && models[0]) localAiModel.value = models[0];
+}
+
+function rememberCurrentLocalAiPreset() {
+  if (organizer.value !== 'localai') return;
+  saveLocalAiPreset(localAiBaseUrl.value.trim() || 'http://127.0.0.1:11434', localAiModel.value.trim());
+}
+
+function loadCloudAiPresets() {
+  try {
+    const value = JSON.parse(localStorage.getItem(CLOUD_AI_PRESETS_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCloudAiPreset(baseUrl, model) {
+  const normalizedBaseUrl = String(baseUrl || '').trim();
+  const normalizedModel = String(model || '').trim();
+  if (!normalizedBaseUrl && !normalizedModel) return;
+  const presets = loadCloudAiPresets().filter((item) => (
+    item.baseUrl !== normalizedBaseUrl || item.model !== normalizedModel
+  ));
+  presets.unshift({ baseUrl: normalizedBaseUrl, model: normalizedModel, updatedAt: Date.now() });
+  localStorage.setItem(CLOUD_AI_PRESETS_KEY, JSON.stringify(presets.slice(0, 30)));
+  renderCloudAiPresets();
+}
+
+function renderCloudAiPresets() {
+  const presets = loadCloudAiPresets();
+  const presetBaseUrls = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.baseUrl).filter(Boolean);
+  const presetModels = Object.values(CLOUD_AI_PROVIDER_PRESETS).map((item) => item.model).filter(Boolean);
+  const baseUrls = [...new Set([...presetBaseUrls, ...presets.map((item) => item.baseUrl).filter(Boolean)])];
+  const models = [...new Set([...CLOUD_AI_MODEL_PRESETS, ...presetModels, ...presets.map((item) => item.model).filter(Boolean)])];
+  cloudAiBaseUrlPresets.innerHTML = baseUrls.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  cloudAiModelPresets.innerHTML = models.map((item) => `<option value="${escapeHtml(item)}"></option>`).join('');
+  if (!cloudAiBaseUrl.value.trim() && baseUrls[0]) cloudAiBaseUrl.value = baseUrls[0];
+  if (!cloudAiModel.value.trim() && models[0]) cloudAiModel.value = models[0];
+  if (!cloudAiApiKey.value.trim()) cloudAiApiKey.value = localStorage.getItem(CLOUD_AI_KEY_STORAGE) || '';
+}
+
+function applyCloudAiProviderPreset() {
+  const preset = CLOUD_AI_PROVIDER_PRESETS[cloudAiProvider.value];
+  if (!preset) return;
+  cloudAiBaseUrl.value = preset.baseUrl || cloudAiBaseUrl.value;
+  if (preset.model) cloudAiModel.value = preset.model;
+  cloudAiStatus.textContent = '已套用服务商预设，请确认模型名称和 API Key 后测试模型。';
+}
+
+function rememberCurrentCloudAiPreset() {
+  if (organizer.value !== 'cloudai') return;
+  saveCloudAiPreset(cloudAiBaseUrl.value.trim(), cloudAiModel.value.trim());
+  if (cloudAiApiKey.value.trim()) {
+    localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+  }
+}
+
+function buildDiagnosticsText() {
+  const info = lastOpenClawInfo || {};
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `智能整理：${organizer.value}`,
+    `OpenClaw 命令输入：${openclawCommand.value.trim() || '自动检测'}`,
+    `OpenClaw 命令实际：${info.command || '未检测'}`,
+    `OpenClaw 版本：${info.version || '未检测'}`,
+    `Node：${info.nodeVersion || '未检测'}`,
+    `Ollama：${info.ollamaVersion || '未检测'}`,
+    `配置有效：${info.configValid ? '是' : '否'}`,
+    `配置文件：${info.configPath || '未检测'}`,
+    `默认模型：${info.defaultModel || '未检测'}`,
+    `本地模型：${(info.localModels || []).map((item) => item.id).join(', ') || '未检测'}`,
+    `当前填写模型：${openclawModel.value.trim() || '留空'}`,
+    `状态：${info.message || openclawStatus.textContent || '未检测'}`
+  ].join('\n');
+}
+
+function buildLocalAiDiagnosticsText() {
+  const info = lastLocalAiInfo || {};
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `智能整理：${organizer.value}`,
+    `本地模型地址：${localAiBaseUrl.value.trim() || info.baseUrl || '默认 http://127.0.0.1:11434'}`,
+    `本地模型名称：${localAiModel.value.trim() || info.selectedModel || '未填写'}`,
+    `检测到的模型：${(info.models || []).map((item) => item.id).join(', ') || '未检测'}`,
+    `状态：${info.message || localAiStatus.textContent || '未检测'}`
+  ].join('\n');
+}
+
+function buildCloudAiDiagnosticsText() {
+  const info = lastCloudAiInfo || {};
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `智能整理：${organizer.value}`,
+    `云端 API 地址：${cloudAiBaseUrl.value.trim() || info.baseUrl || '未填写'}`,
+    `云端模型名称：${cloudAiModel.value.trim() || info.selectedModel || '未填写'}`,
+    `API Key：${cloudAiApiKey.value.trim() ? '已填写' : '未填写'}`,
+    `检测到的模型：${(info.models || []).map((item) => item.id).join(', ') || '未检测'}`,
+    `状态：${info.message || cloudAiStatus.textContent || '未检测'}`
+  ].join('\n');
+}
+
+function buildRuntimeDiagnosticsText() {
+  return [
+    `零创AI 智能转写器：${version.textContent || ''}`,
+    `识别语言：${language.value}`,
+    `Whisper 模型：${model.value}`,
+    `整理方式：${style.value}`,
+    `文档模板：${DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || documentTemplate.value}`,
+    `字幕辅助：${subtitleMode.value}`,
+    `重复内容去重：${dedupeMode.value}`,
+    `录制声音：${audioModeLabel(audioMode.value)}`,
+    `录制范围：${captureModeLabel(captureMode.value)}`,
+    `录制定时：${recordingLimitLabel(selectedRecordingLimitSeconds())}`,
+    `结束缓冲：${recordingBufferSeconds.value || 0} 秒`,
+    `智能整理：${organizer.value}`,
+    `云端 API：${cloudAiBaseUrl.value.trim() || '未填写'} / ${cloudAiModel.value.trim() || '未填写'}`,
+    `本地模型：${localAiBaseUrl.value.trim() || '未填写'} / ${localAiModel.value.trim() || '未填写'}`,
+    `OpenClaw：${openclawCommand.value.trim() || '自动检测'} / ${openclawModel.value.trim() || '默认模型'}`,
+    `输出目录：${outputRoot || '未检测'}`,
+    `当前状态：${statusBox.textContent.split('\n').slice(-12).join('\n')}`
+  ].join('\n');
+}
+
+async function checkOpenClawStatus() {
+  checkOpenClaw.disabled = true;
+  openclawStatus.textContent = '检测中...';
+  try {
+    const info = await window.studio.checkOpenClaw(openClawOptions());
+    renderOpenClawStatus(info);
+    if (info.available) {
+      logStatus(`OpenClaw 已连接：${info.command}`);
+      if (info.defaultModel) logStatus(`OpenClaw 默认模型：${info.defaultModel}`);
+      const localModel = info.localModels?.[0]?.id;
+      if (localModel) logStatus(`可手动指定本地模型：${localModel}`);
+    } else {
+      logStatus(info.message || 'OpenClaw 不可用；增强整理会自动回退本机规则整理。');
+    }
+  } catch (error) {
+    renderOpenClawStatus({ available: false, message: error.message || String(error) });
+    logStatus(`OpenClaw 检测失败：${error.message || String(error)}`);
+  } finally {
+    checkOpenClaw.disabled = organizer.value !== 'openclaw';
+  }
+}
+
+async function checkLocalAiStatus() {
+  checkLocalAi.disabled = true;
+  localAiStatus.textContent = '检测中...';
+  try {
+    const info = await window.studio.checkLocalAi(localAiOptions());
+    renderLocalAiStatus(info);
+    if (info.available) {
+      logStatus(`本地大模型服务已连接：${info.baseUrl}`);
+      if (info.selectedModel) logStatus(`当前本地模型：${info.selectedModel}`);
+      saveLocalAiPreset(info.baseUrl || localAiBaseUrl.value.trim(), info.selectedModel || localAiModel.value.trim());
+    } else {
+      logStatus(info.message || '本地大模型不可用；增强整理会自动回退本机规则整理。');
+    }
+  } catch (error) {
+    renderLocalAiStatus({ available: false, message: error.message || String(error) });
+    logStatus(`本地大模型检测失败：${error.message || String(error)}`);
+  } finally {
+    checkLocalAi.disabled = organizer.value !== 'localai';
+  }
+}
+
+async function testOpenClawStatus() {
+  testOpenClaw.disabled = true;
+  openclawStatus.textContent = '正在测试模型...';
+  try {
+    const result = await window.studio.testOpenClaw(openClawOptions());
+    logStatus(`OpenClaw 模型测试成功：${result.model || '默认模型'}`);
+    openclawStatus.textContent = `模型测试成功：${result.model || 'OpenClaw 默认模型'}`;
+    checkOpenClaw.closest('.openclaw-status')?.classList.add('ready');
+    checkOpenClaw.closest('.openclaw-status')?.classList.remove('error');
+  } catch (error) {
+    openclawStatus.textContent = `模型测试失败：${error.message || String(error)}`;
+    checkOpenClaw.closest('.openclaw-status')?.classList.add('error');
+    checkOpenClaw.closest('.openclaw-status')?.classList.remove('ready');
+    logStatus(`OpenClaw 模型测试失败：${error.message || String(error)}`);
+  } finally {
+    testOpenClaw.disabled = organizer.value !== 'openclaw';
+  }
+}
+
+async function testLocalAiStatus() {
+  testLocalAi.disabled = true;
+  localAiStatus.textContent = '正在测试模型...';
+  try {
+    const result = await window.studio.testLocalAi(localAiOptions());
+    logStatus(`本地大模型测试成功：${result.model}`);
+    localAiStatus.textContent = `模型测试成功：${result.model}`;
+    saveLocalAiPreset(result.baseUrl || localAiBaseUrl.value.trim(), result.model || localAiModel.value.trim());
+    checkLocalAi.closest('.openclaw-status')?.classList.add('ready');
+    checkLocalAi.closest('.openclaw-status')?.classList.remove('error');
+  } catch (error) {
+    localAiStatus.textContent = `模型测试失败：${error.message || String(error)}`;
+    checkLocalAi.closest('.openclaw-status')?.classList.add('error');
+    checkLocalAi.closest('.openclaw-status')?.classList.remove('ready');
+    logStatus(`本地大模型测试失败：${error.message || String(error)}`);
+  } finally {
+    testLocalAi.disabled = organizer.value !== 'localai';
+  }
+}
+
+async function checkCloudAiStatus() {
+  checkCloudAi.disabled = true;
+  cloudAiStatus.textContent = '检测中...';
+  try {
+    const info = await window.studio.checkCloudAi(cloudAiOptions());
+    renderCloudAiStatus(info);
+    if (info.available) {
+      logStatus(`云端 API 已连接：${info.baseUrl}`);
+      if (info.selectedModel) logStatus(`当前云端模型：${info.selectedModel}`);
+      saveCloudAiPreset(info.baseUrl || cloudAiBaseUrl.value.trim(), info.selectedModel || cloudAiModel.value.trim());
+      if (cloudAiApiKey.value.trim()) localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+    } else {
+      logStatus(info.message || '云端 API 不可用；增强整理会自动回退本机规则整理。');
+    }
+  } catch (error) {
+    const message = friendlyAiError(error.message || String(error));
+    renderCloudAiStatus({ available: false, message });
+    logStatus(`云端 API 检测失败：${message}`);
+  } finally {
+    checkCloudAi.disabled = organizer.value !== 'cloudai';
+  }
+}
+
+async function testCloudAiStatus() {
+  testCloudAi.disabled = true;
+  cloudAiStatus.textContent = '正在测试模型...';
+  try {
+    const result = await window.studio.testCloudAi(cloudAiOptions());
+    logStatus(`云端大模型测试成功：${result.model}`);
+    cloudAiStatus.textContent = `模型测试成功：${result.model}`;
+    saveCloudAiPreset(result.baseUrl || cloudAiBaseUrl.value.trim(), result.model || cloudAiModel.value.trim());
+    if (cloudAiApiKey.value.trim()) localStorage.setItem(CLOUD_AI_KEY_STORAGE, cloudAiApiKey.value.trim());
+    checkCloudAi.closest('.openclaw-status')?.classList.add('ready');
+    checkCloudAi.closest('.openclaw-status')?.classList.remove('error');
+  } catch (error) {
+    const message = friendlyAiError(error.message || String(error));
+    cloudAiStatus.textContent = `模型测试失败：${message}`;
+    checkCloudAi.closest('.openclaw-status')?.classList.add('error');
+    checkCloudAi.closest('.openclaw-status')?.classList.remove('ready');
+    logStatus(`云端大模型测试失败：${message}`);
+  } finally {
+    testCloudAi.disabled = organizer.value !== 'cloudai';
+  }
+}
+
+function createJobId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function fileName(filePath) {
+  return filePath.split('/').pop();
+}
+
+function audioModeLabel(mode) {
+  if (mode === 'microphone') return '外部声音';
+  if (mode === 'none') return '无声音';
+  return '系统声音';
+}
+
+function captureModeLabel(mode) {
+  if (mode === 'screen') return '全屏录制';
+  if (mode === 'window') return '锁定窗口';
+  return '框选范围';
+}
+
+function selectedRecordingLimitSeconds() {
+  let baseSeconds = 0;
+  if (recordingDuration.value === 'custom') {
+    baseSeconds = parseVideoDurationSeconds(customDurationMinutes.value);
+  } else if (recordingDuration.value === 'calculated') {
+    const sourceSeconds = parseVideoDurationSeconds(sourceVideoDuration.value);
+    const speed = Number(playbackSpeed.value || 1);
+    if (!sourceSeconds || !Number.isFinite(speed) || speed <= 0) return 0;
+    baseSeconds = Math.ceil(sourceSeconds / speed);
+  } else {
+    baseSeconds = Number(recordingDuration.value || 0);
+  }
+  return baseSeconds > 0 ? baseSeconds + Number(recordingBufferSeconds.value || 0) : 0;
+}
+
+function parseVideoDurationSeconds(value) {
+  const raw = String(value || '').trim().replace(/：/g, ':');
+  if (!raw) return 0;
+  if (raw.includes(':')) {
+    const parts = raw.split(':').map((part) => Number(part.trim()));
+    if (parts.some((part) => !Number.isFinite(part) || part < 0)) return 0;
+    if (parts.length === 2) return Math.round(parts[0] * 60 + parts[1]);
+    if (parts.length === 3) return Math.round(parts[0] * 3600 + parts[1] * 60 + parts[2]);
+    return 0;
+  }
+  const minutes = Number(raw.replace(/[^\d.]/g, ''));
+  return Number.isFinite(minutes) && minutes > 0 ? Math.round(minutes * 60) : 0;
+}
+
+function validateRecordingLimitBeforeStart() {
+  if (recordingDuration.value === 'custom') {
+    const customSeconds = selectedRecordingLimitSeconds();
+    if (customSeconds > 0) return true;
+    logStatus('自定义录制时长需要输入有效时间，例如 00:30:00、30:00、90。');
+    customDurationMinutes.focus();
+    return false;
+  }
+  if (recordingDuration.value !== 'calculated') return true;
+  const sourceSeconds = parseVideoDurationSeconds(sourceVideoDuration.value);
+  const limit = selectedRecordingLimitSeconds();
+  if (sourceSeconds > 0 && limit > 0) return true;
+  logStatus('自动计算录制时长需要先输入有效视频时长，例如 7:05、7：05、90。');
+  sourceVideoDuration.focus();
+  return false;
+}
+
+function recordingRemainingSeconds() {
+  if (!recordingLimitSeconds) return 0;
+  return Math.max(0, recordingLimitSeconds - elapsedSeconds());
+}
+
+function recordingLimitLabel(seconds) {
+  if (!seconds) return '不限时';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainSeconds = seconds % 60;
+  if (hours && minutes) return `${hours} 小时 ${minutes} 分钟`;
+  if (hours) return `${hours} 小时`;
+  if (minutes && remainSeconds) return `${minutes} 分 ${remainSeconds} 秒`;
+  if (minutes) return `${minutes} 分钟`;
+  return `${Math.max(1, remainSeconds)} 秒`;
+}
+
+function updateDurationCalculator() {
+  const calculated = recordingDuration.value === 'calculated';
+  durationCalculator.hidden = !calculated;
+  sourceVideoDuration.disabled = !calculated || Boolean(recordingBackend);
+  playbackSpeed.disabled = !calculated || Boolean(recordingBackend);
+  if (recordingDuration.value === 'custom') {
+    const customSeconds = selectedRecordingLimitSeconds();
+    if (customSeconds) customDurationMinutes.title = `将录制 ${recordingLimitLabel(customSeconds)}`;
+  }
+  if (!calculated) return;
+  const sourceSeconds = parseVideoDurationSeconds(sourceVideoDuration.value);
+  const speed = Number(playbackSpeed.value || 1);
+  const limit = selectedRecordingLimitSeconds();
+  durationHint.textContent = sourceSeconds
+    ? `视频原时长 ${recordingLimitLabel(sourceSeconds)}，${speed} 倍播放，自动录制 ${recordingLimitLabel(limit)}。`
+    : '输入视频时长后自动计算录制时长，支持 90、01:30、01:30:00、中文冒号。';
+}
+
+function expectedFinishLabel(seconds) {
+  if (!seconds) return '预计完成：未设定';
+  const finish = new Date(Date.now() + seconds * 1000);
+  return `预计录制完成：${finish.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function updateWorkflowSummary() {
+  const limit = selectedRecordingLimitSeconds();
+  const template = DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || '通用整理';
+  const dedupeText = dedupeMode.options[dedupeMode.selectedIndex]?.text || dedupeMode.value;
+  const captureText = captureMode.value === 'window' && framePrepared && selectedWindowCapture
+    ? `锁定窗口 · ${selectedWindowCapture.name}`
+    : captureModeLabel(captureMode.value);
+  const audioText = audioModeLabel(audioMode.value);
+  workflowTitle.textContent = captureMode.value === 'screen'
+    ? '全屏录制，转成文档'
+    : (captureMode.value === 'window' ? '锁定窗口录制，转成文档' : '框选录制，转成文档');
+  workflowSummary.textContent = `${audioText} · ${captureText} · ${dedupeText} · ${template}`;
+  expectedFinish.textContent = expectedFinishLabel(limit);
+  audioSummary.textContent = `声音：${audioText}`;
+  modelHint.textContent = model.value === 'medium'
+    ? 'medium 更准但更慢，适合重要课程、三倍速或口音较重内容。'
+    : (model.value === 'base' ? 'base 更快但准确率较低，适合短内容快速预览。' : 'small 适合多数直播；倍速高或内容重要时建议 medium。');
+  dedupeHint.textContent = dedupeMode.value === 'strong'
+    ? '强力去重适合重复严重的录制，但可能误删主播刻意重复强调。'
+    : (dedupeMode.value === 'off' ? '已关闭去重，卡顿回放造成的重复内容会保留。' : '普通去重默认移除卡顿回放造成的重复片段。');
+}
+
+function startButtonText() {
+  if (recordingBackend) return '正在录制';
+  if (framePrepared) return '开始录制';
+  if (captureMode.value === 'region') return '选择录屏范围';
+  if (captureMode.value === 'window') return '选择要锁定的窗口';
+  return '开始录制';
+}
+
+function updateRecordingButtons() {
+  const isRecording = Boolean(recordingBackend);
+  const isPaused = (recordingBackend === 'electron' && mediaRecorder?.state === 'paused')
+    || (recordingBackend === 'native' && nativePaused);
+  loadSources.disabled = isRecording || isPaused;
+  loadSources.textContent = startButtonText();
+  stopRecording.disabled = !isRecording;
+  stopRecording.textContent = '停止录制';
+  pauseRecording.disabled = !isRecording || isPaused;
+  adjustRecordingFrame.disabled = !isPaused;
+  resumeRecording.disabled = !isPaused;
+  pauseRecording.hidden = isPaused;
+  adjustRecordingFrame.hidden = !isPaused || captureMode.value !== 'region';
+  resumeRecording.hidden = !isPaused;
+  recordingDuration.disabled = isRecording;
+  customDurationMinutes.disabled = isRecording || recordingDuration.value !== 'custom';
+  recordingBufferSeconds.disabled = isRecording;
+  updateDurationCalculator();
+  updateWorkflowSummary();
+}
+
+function updateReadyRecordingWidget() {
+  if (!framePrepared || recordingBackend) return;
+  window.studio.recordingWidgetState({
+    status: 'ready',
+    elapsed: 0,
+    remaining: selectedRecordingLimitSeconds(),
+    audioLabel: currentAudioLabel || audioModeLabel(audioMode.value),
+    canPause: false
+  });
+}
+
+function intersectArea(a, b) {
+  const x1 = Math.max(a.x, b.x);
+  const y1 = Math.max(a.y, b.y);
+  const x2 = Math.min(a.x + a.width, b.x + b.width);
+  const y2 = Math.min(a.y + a.height, b.y + b.height);
+  return Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+}
+
+function resetCaptureFrameState() {
+  framePrepared = false;
+  loadSources.textContent = startButtonText();
+  stopRecording.textContent = '停止录制';
+}
+
+async function prepareCaptureFrame() {
+  if (captureMode.value === 'window') {
+    if (!(await window.studio.nativeRecorderAvailable())) {
+      return { mode: 'screen' };
+    }
+    if (!selectedWindowCapture?.windowId) {
+      throw new Error('请先选择要锁定的窗口。');
+    }
+    await window.studio.hideRecordingFrame();
+    return {
+      mode: 'window',
+      window: {
+        sourceId: selectedWindowCapture.sourceId,
+        windowId: selectedWindowCapture.windowId,
+        name: selectedWindowCapture.name
+      }
+    };
+  }
+  if (captureMode.value !== 'region') {
+    await window.studio.hideRecordingFrame();
+    await window.studio.recordingFrameCommand('passthrough');
+    return { mode: 'screen' };
+  }
+  const frame = await window.studio.getRecordingFrame();
+  return frameToCapture(frame);
+}
+
+function renderWindowPicker(items) {
+  if (!items.length) {
+    windowPickerList.innerHTML = '<div class="window-picker-empty">没有找到可锁定的窗口。请先把要录制的视频窗口打开到前台，再点一次刷新列表。</div>';
+    return;
+  }
+  windowPickerList.innerHTML = '';
+  for (const item of items) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'window-picker-item';
+    const thumb = item.thumbnailDataUrl
+      ? Object.assign(document.createElement('img'), { className: 'window-picker-thumb', src: item.thumbnailDataUrl, alt: '' })
+      : Object.assign(document.createElement('div'), { className: 'window-picker-thumb' });
+    const meta = document.createElement('div');
+    meta.className = 'window-picker-meta';
+    const title = document.createElement('strong');
+    title.textContent = item.name;
+    const idText = document.createElement('span');
+    idText.textContent = `窗口 ID：${item.windowId}`;
+    const hint = document.createElement('span');
+    hint.textContent = '选中后会锁定录制这个窗口，切到其他桌面也继续跟着它录。';
+    meta.append(title, idText, hint);
+    button.append(thumb, meta);
+    button.addEventListener('click', () => {
+      pendingWindowCapture = item;
+      windowPickerDialog.returnValue = 'select';
+      windowPickerDialog.close();
+    });
+    windowPickerList.appendChild(button);
+  }
+}
+
+async function loadWindowPickerOptions(message = '请选择正在播放内容的窗口。开始录制后，即使你切换到别的桌面，也会优先持续录这个窗口。') {
+  windowPickerHint.textContent = message;
+  windowPickerList.innerHTML = '<div class="window-picker-empty">正在读取窗口列表...</div>';
+  const items = await window.studio.listCaptureWindows();
+  renderWindowPicker(items);
+}
+
+async function promptWindowCaptureSelection() {
+  pendingWindowCapture = null;
+  await loadWindowPickerOptions();
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      windowPickerDialog.removeEventListener('close', handleClose);
+      const selected = windowPickerDialog.returnValue === 'select' ? pendingWindowCapture : null;
+      pendingWindowCapture = null;
+      resolve(selected);
+    };
+    windowPickerDialog.addEventListener('close', handleClose);
+    windowPickerDialog.showModal();
+  });
+}
+
+function frameToCapture(frame) {
+  if (!frame) return { mode: 'screen' };
+  const windowBounds = frame.windowBounds || null;
+  const frameBounds = {
+    x: windowBounds ? windowBounds.x : frame.bounds.x,
+    y: windowBounds ? windowBounds.y : frame.bounds.y,
+    width: windowBounds ? windowBounds.width : frame.bounds.width,
+    height: windowBounds ? windowBounds.height : frame.bounds.height
+  };
+  const displays = screenDetails();
+  const display = displays
+    .map((item) => ({ item, area: intersectArea(frameBounds, item.bounds) }))
+    .sort((a, b) => b.area - a.area)[0]?.item;
+  if (!display) return { mode: 'screen' };
+  if (frame.mode === 'screen') {
+    return {
+      mode: 'screen',
+      screen: { x: display.bounds.x, y: display.bounds.y }
+    };
+  }
+  const x = Math.max(0, frameBounds.x - display.bounds.x);
+  const y = Math.max(0, frameBounds.y - display.bounds.y);
+  const width = Math.min(frameBounds.width, display.bounds.width - x);
+  const height = Math.min(frameBounds.height, display.bounds.height - y);
+  return {
+    mode: 'region',
+    screen: { x: display.bounds.x, y: display.bounds.y },
+    region: { x, y, width, height }
+  };
+}
+
+function screenDetails() {
+  if (displayInfo.length) return displayInfo;
+  return [{ bounds: { x: 0, y: 0, width: window.screen.width, height: window.screen.height } }];
 }
 
 function ensureJobsReady() {
@@ -41,18 +906,198 @@ function ensureJobsReady() {
   }
 }
 
-function createJob(filePath) {
+function selectedOrganizeConcurrency() {
+  const parsed = Number.parseInt(organizeConcurrency?.value || '2', 10);
+  if (Number.isNaN(parsed)) return 2;
+  return Math.min(5, Math.max(1, parsed));
+}
+
+function updateQueueHint() {
+  if (!queueHint) return;
+  const waiting = transcribeQueue.filter((row) => row.isConnected && row.dataset.queued === 'true').length;
+  queueHint.textContent = `当前并发 ${selectedOrganizeConcurrency()} 个；运行 ${activeTranscriptions} 个，排队 ${waiting} 个。`;
+}
+
+function removeFromTranscribeQueue(row) {
+  transcribeQueue = transcribeQueue.filter((item) => item !== row);
+  if (row?.dataset) row.dataset.queued = 'false';
+  updateQueueHint();
+}
+
+function pumpTranscribeQueue() {
+  updateQueueHint();
+  const limit = selectedOrganizeConcurrency();
+  while (activeTranscriptions < limit && transcribeQueue.length) {
+    const row = transcribeQueue.shift();
+    if (!row?.isConnected || row.dataset.queued !== 'true' || row.dataset.running === 'true') continue;
+    row.dataset.queued = 'false';
+    activeTranscriptions += 1;
+    updateQueueHint();
+    runTranscription(row).finally(() => {
+      activeTranscriptions = Math.max(0, activeTranscriptions - 1);
+      updateQueueHint();
+      pumpTranscribeQueue();
+    });
+  }
+}
+
+function enqueueTranscription(row) {
+  if (!row || row.dataset.running === 'true' || row.dataset.queued === 'true') return;
+  row.dataset.queued = 'true';
+  setJobState(row, '', '排队中');
+  updateJobProgress(row, { percent: 0, message: '等待空闲整理名额...' });
+  appendJobLog(row, `已加入无人值守队列；当前并发上限：${selectedOrganizeConcurrency()}。`);
+  const startButton = row.querySelector('.start-transcribe');
+  if (startButton) startButton.hidden = true;
+  transcribeQueue.push(row);
+  pumpTranscribeQueue();
+}
+
+function startWaitingJobs() {
+  const rows = [...jobs.querySelectorAll('.job')].reverse();
+  let count = 0;
+  for (const row of rows) {
+    if (row.dataset.running === 'true' || row.dataset.queued === 'true') continue;
+    const badgeText = row.querySelector('.badge')?.textContent || '';
+    if (badgeText === '完成' || badgeText === '处理中' || badgeText === '生成中') continue;
+    enqueueTranscription(row);
+    count += 1;
+  }
+  logStatus(count ? `已将 ${count} 个任务加入排队处理。` : '没有可加入队列的待处理任务。');
+}
+
+function defaultNameFromPath(filePath) {
+  return fileName(filePath).replace(/\.[^.]+$/, '');
+}
+
+async function askName({ title, message, defaultName }) {
+  if (!promptForNames.checked) return '';
+  const run = () => showNamePrompt({ title, message, defaultName });
+  const queued = namePromptQueue.then(run, run);
+  namePromptQueue = queued.catch(() => {});
+  return queued;
+}
+
+async function showNamePrompt({ title, message, defaultName }) {
+  await window.studio.restoreMainWindow();
+  nameDialogTitle.textContent = title;
+  nameDialogText.textContent = message;
+  nameDialogInput.value = defaultName || '';
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      nameDialog.removeEventListener('close', handleClose);
+      resolve(nameDialog.returnValue === 'confirm' ? nameDialogInput.value.trim() : '');
+    };
+    nameDialog.addEventListener('close', handleClose);
+    nameDialog.showModal();
+    nameDialogInput.focus();
+    nameDialogInput.select();
+  });
+}
+
+async function showOrganizerWarning(result, row) {
+  const report = result?.processing_report || {};
+  const organizerUsed = result?.organizer || report.organizer_actual || '';
+  const failure = report.failure_reason || '';
+  if (!String(organizerUsed).includes('fallback') && !failure) return;
+  const run = () => showOrganizerWarningDialog(result, row, organizerUsed, failure);
+  const queued = namePromptQueue.then(run, run);
+  namePromptQueue = queued.catch(() => {});
+  return queued;
+}
+
+async function showOrganizerWarningDialog(result, row, organizerUsed, failure) {
+  await window.studio.restoreMainWindow();
+  organizerWarningText.textContent = [
+    `本次智能整理实际使用：${organizerUsed || '本机规则整理'}`,
+    failure ? `原因：${failure}` : '',
+    '建议：确认本地模型服务正在运行、模型名称填写正确；内容很长时可改用更快模型。可以保留当前本机整理结果，也可以继续请求本地模型重新转写。'
+  ].filter(Boolean).join('\n');
+  retryOrganizerWarning.hidden = !(result?.processing_report?.organizer_requested === 'localai');
+  organizerWarningDialog.showModal();
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      organizerWarningDialog.removeEventListener('close', handleClose);
+      const action = organizerWarningDialog.returnValue || 'keep';
+      if (action === 'retry' && row?.dataset?.filePath) {
+        appendJobLog(row, '用户选择继续请求本地模型，已创建一条新的重新转写任务。');
+        queueTranscription(row.dataset.filePath, true, { outputMode: 'keep' });
+      }
+      resolve(action);
+    };
+    organizerWarningDialog.addEventListener('close', handleClose);
+  });
+}
+
+async function renameWithPrompt(filePath, prompt) {
+  const name = await askName({ ...prompt, defaultName: defaultNameFromPath(filePath) });
+  if (!name) return filePath;
+  try {
+    const result = await window.studio.renamePath({ path: filePath, name });
+    if (result.path && result.path !== filePath) {
+      logStatus(`${prompt.doneLabel || '已重命名'}：${result.path}`);
+    }
+    return result.path || filePath;
+  } catch (error) {
+    logStatus(`命名失败，已保留默认名称：${error.message || String(error)}`);
+    return filePath;
+  }
+}
+
+async function promptForRecordingName(filePath) {
+  return renameWithPrompt(filePath, {
+    title: '录制完成',
+    message: '可以为刚保存的录制文件命名。取消或留空将保留默认名称。',
+    doneLabel: '录制文件已重命名'
+  });
+}
+
+async function promptForOutputFolderName(outputDir) {
+  return renameWithPrompt(outputDir, {
+    title: '转写完成',
+    message: '可以为本次转写结果文件夹命名。取消或留空将保留默认名称。',
+    doneLabel: '转写文件夹已重命名'
+  });
+}
+
+function createJob(filePath, options = {}) {
   ensureJobsReady();
+  const jobId = createJobId();
   const row = document.createElement('article');
   row.className = 'job';
+  row.dataset.jobId = jobId;
+  row.dataset.filePath = filePath;
+  row.dataset.outputMode = options.outputMode || 'keep';
   row.innerHTML = `
     <div class="job-title">
-      <strong>${escapeHtml(filePath.split('/').pop())}</strong>
+      <strong>${escapeHtml(fileName(filePath))}</strong>
       <span class="badge">等待</span>
     </div>
+    <div class="job-progress">
+      <div class="progress-head">
+        <span class="progress-label">等待开始</span>
+        <span class="progress-percent">0%</span>
+      </div>
+      <div class="progress-track">
+        <span class="progress-fill"></span>
+      </div>
+      <span class="progress-time"></span>
+    </div>
     <pre class="job-log"></pre>
-    <div class="job-actions"></div>
+    <div class="job-actions">
+      <button class="start-transcribe">开始转录</button>
+      <button class="stop-transcribe danger" hidden>停止转录</button>
+      <button class="copy-job-log">复制日志</button>
+      <button class="delete-job danger">删除任务</button>
+    </div>
   `;
+  row.querySelector('.start-transcribe').addEventListener('click', () => enqueueTranscription(row));
+  row.querySelector('.stop-transcribe').addEventListener('click', () => stopTranscription(row));
+  row.querySelector('.copy-job-log').addEventListener('click', async () => {
+    await window.studio.copyText(row.querySelector('.job-log')?.textContent || '');
+    appendJobLog(row, '任务日志已复制。');
+  });
+  row.querySelector('.delete-job').addEventListener('click', () => deleteJob(row));
   jobs.prepend(row);
   return row;
 }
@@ -69,6 +1114,48 @@ function appendJobLog(row, text) {
   log.textContent = `${log.textContent}${log.textContent ? '\n' : ''}${text}`;
 }
 
+function updateJobsEmptyState() {
+  if (jobs.querySelector('.job')) return;
+  jobs.classList.add('empty');
+  jobs.textContent = '暂无任务';
+}
+
+function deleteJob(row) {
+  if (row.dataset.running === 'true') {
+    appendJobLog(row, '任务正在转写中，请先停止转录再删除任务。');
+    return;
+  }
+  removeFromTranscribeQueue(row);
+  row.remove();
+  updateJobsEmptyState();
+}
+
+function formatClock(seconds) {
+  const value = Math.max(0, Math.floor(seconds || 0));
+  const h = Math.floor(value / 3600);
+  const m = Math.floor((value % 3600) / 60);
+  const s = value % 60;
+  if (h) return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateJobProgress(row, progress = {}) {
+  if (!row) return;
+  const percent = Math.max(0, Math.min(100, Number(progress.percent || 0)));
+  const label = row.querySelector('.progress-label');
+  const value = row.querySelector('.progress-percent');
+  const fill = row.querySelector('.progress-fill');
+  const time = row.querySelector('.progress-time');
+  if (label) label.textContent = progress.message || progress.stage || '处理中';
+  if (value) value.textContent = `${Math.round(percent)}%`;
+  if (fill) fill.style.width = `${percent}%`;
+  if (time) {
+    time.textContent = progress.total
+      ? `转录时间进度：${formatClock(progress.current)} / ${formatClock(progress.total)}`
+      : '';
+  }
+}
+
 function addResultActions(row, result) {
   const actions = row.querySelector('.job-actions');
   actions.textContent = '';
@@ -76,6 +1163,7 @@ function addResultActions(row, result) {
     ['Markdown', result.markdown],
     ['TXT', result.txt],
     ['DOCX', result.docx],
+    ['SRT', result.srt],
     ['显示文件夹', result.output_dir]
   ]) {
     if (!target) continue;
@@ -87,21 +1175,151 @@ function addResultActions(row, result) {
     });
     actions.append(button);
   }
+  if (result.segments) {
+    const templateButton = document.createElement('button');
+    templateButton.textContent = '换模板生成';
+    templateButton.addEventListener('click', () => regenerateFromTemplate(row, result));
+    actions.append(templateButton);
+  }
 }
 
-async function transcribe(filePath) {
-  const row = createJob(filePath);
-  setJobState(row, '', '处理中');
-  appendJobLog(row, '抽取音频、AI 转写并整理文档...');
+async function askTemplate(defaultTemplate = 'live_recap') {
+  templateGenerateSelect.value = defaultTemplate;
+  return new Promise((resolve) => {
+    const handleClose = () => {
+      templateDialog.removeEventListener('close', handleClose);
+      resolve(templateDialog.returnValue === 'confirm' ? templateGenerateSelect.value : '');
+    };
+    templateDialog.addEventListener('close', handleClose);
+    templateDialog.showModal();
+  });
+}
+
+async function regenerateFromTemplate(row, result) {
+  const nextTemplate = await askTemplate(documentTemplate.value || 'live_recap');
+  if (!nextTemplate) return;
+  const jobId = createJobId();
+  row.dataset.jobId = jobId;
+  row.dataset.running = 'true';
+  setJobState(row, '', '生成中');
+  updateJobProgress(row, { percent: 4, message: '正在换模板生成...' });
+  appendJobLog(row, `换模板生成：${DOCUMENT_TEMPLATE_LABELS[nextTemplate] || nextTemplate}。`);
+  rememberCurrentLocalAiPreset();
+  rememberCurrentCloudAiPreset();
   try {
-    const result = await window.studio.transcribeMedia({ filePath, ...jobOptions() });
+    const regenerated = await window.studio.regenerateTemplate({
+      jobId,
+      segmentsPath: result.segments,
+      sourcePath: row.dataset.filePath,
+      sourceName: fileName(row.dataset.filePath),
+      ...jobOptions({ documentTemplate: nextTemplate, outputMode: 'keep' })
+    });
+    const renamedOutputDir = await promptForOutputFolderName(regenerated.output_dir);
+    const finalResult = updateResultPathsAfterRename(regenerated, renamedOutputDir);
     setJobState(row, 'done', '完成');
-    appendJobLog(row, result.summary || '已生成文档。');
-    addResultActions(row, result);
+    updateJobProgress(row, { percent: 100, message: '换模板生成完成。' });
+    appendJobLog(row, finalResult.summary || '已生成新模板文档。');
+    if (finalResult.processing_report?.organizer_actual) {
+      appendJobLog(row, `智能整理实际使用：${finalResult.processing_report.organizer_actual}`);
+    }
+    addResultActions(row, finalResult);
+    await showOrganizerWarning(finalResult, row);
   } catch (error) {
     setJobState(row, 'error', '失败');
+    updateJobProgress(row, { percent: 0, message: '换模板生成失败。' });
     appendJobLog(row, error.message || String(error));
+  } finally {
+    row.dataset.running = 'false';
   }
+}
+
+function updateResultPathsAfterRename(result, renamedOutputDir) {
+  if (!renamedOutputDir || renamedOutputDir === result.output_dir) return result;
+  const replaceDir = (target) => target ? target.replace(result.output_dir, renamedOutputDir) : target;
+  return {
+    ...result,
+    output_dir: renamedOutputDir,
+    markdown: replaceDir(result.markdown),
+    txt: replaceDir(result.txt),
+    docx: replaceDir(result.docx),
+    srt: replaceDir(result.srt),
+    segments: replaceDir(result.segments)
+  };
+}
+
+async function runTranscription(row) {
+  const filePath = row.dataset.filePath;
+  const jobId = row.dataset.jobId;
+  const startButton = row.querySelector('.start-transcribe');
+  const stopButton = row.querySelector('.stop-transcribe');
+  row.dataset.running = 'true';
+  row.dataset.queued = 'false';
+  setJobState(row, '', '处理中');
+  updateJobProgress(row, { percent: 2, message: '准备处理...' });
+  appendJobLog(row, '抽取音频、AI 转写并整理文档...');
+  if (startButton) startButton.hidden = true;
+  if (stopButton) {
+    stopButton.disabled = false;
+    stopButton.hidden = false;
+  }
+  rememberCurrentLocalAiPreset();
+  rememberCurrentCloudAiPreset();
+  try {
+    const result = await window.studio.transcribeMedia({
+      filePath,
+      jobId,
+      ...jobOptions({
+        outputMode: row.dataset.outputMode
+      })
+    });
+    const renamedOutputDir = await promptForOutputFolderName(result.output_dir);
+    const finalResult = updateResultPathsAfterRename(result, renamedOutputDir);
+    setJobState(row, 'done', '完成');
+    updateJobProgress(row, { percent: 100, message: '转写完成。' });
+    appendJobLog(row, finalResult.summary || '已生成文档。');
+    if (finalResult.processing_report?.organizer_actual) {
+      appendJobLog(row, `智能整理实际使用：${finalResult.processing_report.organizer_actual}`);
+    }
+    if (finalResult.processing_report?.failure_reason) {
+      appendJobLog(row, `智能整理失败原因：${finalResult.processing_report.failure_reason}`);
+    }
+    addResultActions(row, finalResult);
+    await showOrganizerWarning(finalResult, row);
+  } catch (error) {
+    const message = error.message || String(error);
+    if (message.includes('转录已停止')) {
+      setJobState(row, '', '已停止');
+      updateJobProgress(row, { percent: 0, message: '转录已停止。' });
+      appendJobLog(row, '转录已停止，录屏文件仍已保存。');
+      if (startButton) startButton.hidden = false;
+    } else {
+      setJobState(row, 'error', '失败');
+      updateJobProgress(row, { percent: 0, message: '转写失败。' });
+      appendJobLog(row, message);
+      if (startButton) startButton.hidden = false;
+    }
+    if (stopButton) stopButton.hidden = true;
+  } finally {
+    row.dataset.running = 'false';
+    row.dataset.queued = 'false';
+    updateQueueHint();
+  }
+}
+
+async function stopTranscription(row) {
+  row.querySelector('.stop-transcribe').disabled = true;
+  await window.studio.stopTranscription(row.dataset.jobId);
+  appendJobLog(row, '正在停止转录...');
+}
+
+function queueTranscription(filePath, shouldStart = true, options = {}) {
+  const row = createJob(filePath, options);
+  if (shouldStart) enqueueTranscription(row);
+  else {
+    setJobState(row, '', '待转录');
+    appendJobLog(row, '录制文件已保存。需要时可点击“开始转录”。');
+  }
+  return row;
 }
 
 function escapeHtml(value) {
@@ -116,28 +1334,77 @@ function escapeHtml(value) {
 
 pickMedia.addEventListener('click', async () => {
   const paths = await window.studio.chooseMedia();
-  for (const filePath of paths) transcribe(filePath);
+  for (const filePath of paths) queueTranscription(filePath, false);
+});
+
+rewriteMedia.addEventListener('click', async () => {
+  const paths = await window.studio.chooseRecordingMedia();
+  for (const filePath of paths) {
+    queueTranscription(filePath, true, { outputMode: rewriteMode.value });
+  }
 });
 
 loadSources.addEventListener('click', async () => {
   try {
+    if (!framePrepared && captureMode.value === 'region') {
+      await window.studio.showRecordingFrame();
+      await window.studio.recordingFrameCommand('interactive');
+      framePrepared = true;
+      currentAudioLabel = audioModeLabel(audioMode.value);
+      await window.studio.showRecordingWidget();
+      await window.studio.recordingWidgetState({
+        status: 'ready',
+        elapsed: 0,
+        remaining: selectedRecordingLimitSeconds(),
+        audioLabel: currentAudioLabel,
+        canPause: false
+      });
+      updateRecordingButtons();
+      logStatus('录制范围线框已显示，但此时还没有开始录制。请拖到主屏或副屏的视频位置，调整好后点击主界面或线框上的“开始录制”。');
+      return;
+    }
+    if (!framePrepared && captureMode.value === 'window') {
+      if (!(await window.studio.nativeRecorderAvailable())) {
+        framePrepared = true;
+        await startRecording();
+        return;
+      }
+      const selected = await promptWindowCaptureSelection();
+      if (!selected) {
+        logStatus('已取消选择锁定窗口。');
+        return;
+      }
+      selectedWindowCapture = selected;
+      framePrepared = true;
+      currentAudioLabel = audioModeLabel(audioMode.value);
+      updateRecordingButtons();
+      logStatus(`已锁定窗口：${selected.name}。现在点击“开始录制”即可开始；切换到其他桌面后会继续录这个窗口。`);
+      return;
+    }
     await startRecording();
   } catch (error) {
     logStatus(`录屏启动失败：${error.message || String(error)}`);
-    logStatus('请在 系统设置 > 隐私与安全性 > 屏幕与系统音频录制 中允许本应用，然后重启应用再试。');
+    logStatus('请确认系统已允许本应用使用屏幕录制与麦克风权限，然后重启应用再试。');
   }
 });
 
 window.studio.onNativeRecordingEvent((payload) => {
   if (payload.event === 'log' && payload.message) logStatus(payload.message);
   if (payload.event === 'started') logStatus('原生录制已开始写入文件。');
-  if (payload.event === 'captureStarted') logStatus('原生屏幕捕获已启动，系统音频录制已请求。');
+  if (payload.event === 'captureStarted') {
+    const targetText = payload.captureTarget === 'window'
+      ? `原生窗口捕获已启动${payload.windowTitle ? `：${payload.windowTitle}` : ''}。`
+      : (payload.audioMode === 'microphone'
+        ? '原生屏幕捕获已启动，外部麦克风录制已请求。'
+        : '原生屏幕捕获已启动，系统音频录制已请求。');
+    logStatus(targetText);
+  }
   if (payload.event === 'error') {
     logStatus(`原生录制错误：${payload.message || '未知错误'}`);
     finishNativeRecording(payload.filePath, payload.size, false);
   }
   if (payload.event === 'closed') {
-    finishNativeRecording(payload.filePath, payload.size, true);
+    finishNativeRecording(payload.filePath, payload.size, nativeStopIntent !== 'pause');
   }
 });
 
@@ -166,7 +1433,7 @@ async function requestDisplayStream() {
     });
   } catch (firstError) {
     logStatus(`屏幕+音频录制请求失败：${firstError.message || String(firstError)}`);
-    logStatus('正在降级尝试只录制屏幕。若需要抖音声音，请确认系统允许屏幕与系统音频录制。');
+    logStatus('正在降级尝试只录制屏幕。若需要系统声音，请确认系统允许屏幕录制。');
     return navigator.mediaDevices.getDisplayMedia({
       video: {
         frameRate: 30,
@@ -178,7 +1445,7 @@ async function requestDisplayStream() {
   }
 }
 
-async function requestMicrophoneFallback() {
+async function requestMicrophoneFallback(reason = 'fallback') {
   try {
     const micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -188,7 +1455,9 @@ async function requestMicrophoneFallback() {
       },
       video: false
     });
-    logStatus('未检测到系统音频轨，已改用麦克风兜底录音。请使用电脑外放播放抖音声音，不要戴耳机。');
+    logStatus(reason === 'selected'
+      ? '已选择录制外部声音，音频来自麦克风。'
+      : '未检测到系统音频轨，已改用麦克风兜底录音。请使用电脑外放播放视频声音，不要戴耳机。');
     return micStream;
   } catch (error) {
     logStatus(`麦克风兜底录音也未启用：${error.message || String(error)}`);
@@ -196,12 +1465,12 @@ async function requestMicrophoneFallback() {
   }
 }
 
-async function buildRecordingStream(displayStream) {
+async function buildRecordingStream(displayStream, selectedAudioMode) {
   const tracks = [...displayStream.getVideoTracks(), ...displayStream.getAudioTracks()];
-  if (displayStream.getAudioTracks().length > 0) {
+  if (selectedAudioMode === 'system' && displayStream.getAudioTracks().length > 0) {
     return { stream: new MediaStream(tracks), audioMode: 'system' };
   }
-  const micStream = await requestMicrophoneFallback();
+  const micStream = await requestMicrophoneFallback(selectedAudioMode === 'microphone' ? 'selected' : 'fallback');
   if (micStream?.getAudioTracks().length) {
     return {
       stream: new MediaStream([...displayStream.getVideoTracks(), ...micStream.getAudioTracks()]),
@@ -212,71 +1481,237 @@ async function buildRecordingStream(displayStream) {
 }
 
 async function startRecording() {
-  if (await window.studio.nativeRecorderAvailable()) {
+  if (!validateRecordingLimitBeforeStart()) return;
+  const selectedAudioMode = audioMode.value;
+  currentAudioLabel = audioModeLabel(selectedAudioMode);
+  recordingLimitSeconds = selectedRecordingLimitSeconds();
+  autoStopTriggered = false;
+  currentCapture = await prepareCaptureFrame();
+  const nativeAvailable = await window.studio.nativeRecorderAvailable();
+  if (currentCapture.mode === 'window' && nativeAvailable) {
+    await startNativeRecording(selectedAudioMode);
+    return;
+  }
+  if (selectedAudioMode === 'system' && nativeAvailable) {
     try {
-      await startNativeRecording();
+      await startNativeRecording(selectedAudioMode);
       return;
     } catch (error) {
       logStatus(`原生录制启动失败，退回兼容录制：${error.message || String(error)}`);
     }
   }
-  await startElectronRecording();
+  if (currentCapture.mode === 'region') {
+  logStatus('外部声音兼容录制会打开系统选择器，请在系统弹窗中选择要录制的屏幕或窗口。');
+  }
+  await startElectronRecording(selectedAudioMode);
 }
 
-async function startNativeRecording() {
+async function testAudioBeforeRecording() {
+  if (audioMode.value === 'system') {
+    audioCheckStatus.textContent = '系统声音由系统录屏捕获提供，建议先短录 5 秒确认输出文件有声音。';
+    logStatus('系统声音检测提示：请先短录 5 秒确认系统音频轨正常。');
+    return;
+  }
+  testAudioInput.disabled = true;
+  audioCheckStatus.textContent = '正在检测麦克风输入...';
+  let stream = null;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: false
+      },
+      video: false
+    });
+    const context = new AudioContext();
+    const source = context.createMediaStreamSource(stream);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    const data = new Uint8Array(analyser.fftSize);
+    let peak = 0;
+    const start = performance.now();
+    while (performance.now() - start < 1600) {
+      analyser.getByteTimeDomainData(data);
+      for (const value of data) {
+        peak = Math.max(peak, Math.abs(value - 128) / 128);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+    await context.close();
+    const result = { ok: peak > 0.03, peak };
+    audioCheckStatus.textContent = result.ok
+      ? `外部声音检测通过，当前音量峰值：${Math.round(result.peak * 100)}%。`
+      : '没有检测到明显麦克风声音，请检查输入设备或提高音量。';
+    logStatus(audioCheckStatus.textContent);
+  } catch (error) {
+    audioCheckStatus.textContent = `外部声音检测失败：${error.message || String(error)}`;
+    logStatus(audioCheckStatus.textContent);
+  } finally {
+    if (stream) stream.getTracks().forEach((track) => track.stop());
+    testAudioInput.disabled = false;
+  }
+}
+
+async function startNativeRecording(selectedAudioMode) {
   if (recordingBackend) return;
   recordingBackend = 'native';
-  loadSources.disabled = true;
-  stopRecording.disabled = false;
+  nativePaused = false;
+  nativeStopIntent = 'stop';
+  nativeSegments = [];
+  nativeAudioMode = selectedAudioMode;
   recordingStartedAt = Date.now();
   accumulatedPausedMs = 0;
   pauseStartedAt = 0;
-  logStatus('正在启动 macOS 原生录屏，会请求屏幕和系统音频权限。');
+  updateRecordingButtons();
+  logStatus(selectedAudioMode === 'system'
+    ? '正在启动 macOS 原生录屏，会请求屏幕和系统音频权限。'
+    : '正在启动 macOS 原生录屏，会请求屏幕录制和麦克风权限。');
+  if (currentCapture?.mode === 'window' && currentCapture.window?.name) {
+    logStatus(`本次会锁定窗口录制：${currentCapture.window.name}`);
+  }
   try {
-    const result = await window.studio.startNativeRecording();
-    nativeRecordingFile = result.filePath;
-    logStatus(`原生录屏文件已开始自动保存：${nativeRecordingFile}`);
+    await startNativeSegment(selectedAudioMode);
+    if (currentCapture?.mode === 'window') {
+      await window.studio.hideRecordingFrame();
+    } else {
+      await window.studio.recordingFrameCommand('passthrough');
+    }
     await window.studio.showRecordingWidget();
-    startWidgetTimer('recording');
+    updateRecordingButtons();
+    await window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
+    startWidgetTimer('recording', { audioMode: selectedAudioMode, canPause: true });
+    scheduleAutoStop();
+    logRecordingLimit();
   } catch (error) {
     recordingBackend = null;
     nativeRecordingFile = null;
-    stopRecording.disabled = true;
-    loadSources.disabled = false;
+    nativePaused = false;
+    nativeSegments = [];
+    autoStopTriggered = false;
+    stopAutoStopTimer();
+    stopWidgetTimer();
+    if (currentCapture?.mode === 'window') {
+      resetCaptureFrameState();
+      selectedWindowCapture = null;
+      await window.studio.hideRecordingWidget();
+      await window.studio.hideRecordingFrame();
+    } else {
+      framePrepared = true;
+    }
+    updateRecordingButtons();
     throw error;
   }
+}
+
+async function startNativeSegment(selectedAudioMode) {
+  const result = await window.studio.startNativeRecording({ audioMode: selectedAudioMode, capture: currentCapture });
+  nativeRecordingFile = result.filePath;
+  logStatus(`原生录屏文件已开始自动保存：${nativeRecordingFile}`);
 }
 
 async function finishNativeRecording(filePath, size, shouldTranscribe) {
   if (recordingBackend !== 'native') return;
-  recordingBackend = null;
+  if (filePath && size > 0) nativeSegments.push(filePath);
   nativeRecordingFile = null;
+  if (nativeStopIntent === 'pause') {
+    nativePaused = true;
+    pauseStartedAt = Date.now();
+    logStatus('录制已暂停，当前片段已保存。');
+    updateRecordingButtons();
+    await window.studio.recordingFrameCommand('paused');
+    await window.studio.recordingWidgetState({ status: 'paused', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
+    return;
+  }
+  recordingBackend = null;
+  nativePaused = false;
+  stopAutoStopTimer();
+  recordingLimitSeconds = 0;
+  autoStopTriggered = false;
   stopWidgetTimer();
-  stopRecording.disabled = true;
-  loadSources.disabled = false;
+  resetCaptureFrameState();
+  updateRecordingButtons();
   await window.studio.hideRecordingWidget();
-  if (filePath && size > 0) {
-    logStatus(`录屏已保存：${filePath}`);
-    if (shouldTranscribe) transcribe(filePath);
+  await window.studio.hideRecordingFrame();
+  if (nativeSegments.length) {
+    try {
+      const result = await window.studio.mergeRecordingSegments({ segments: nativeSegments });
+      let recordingPath = result.filePath;
+      logStatus(result.merged ? `录制片段已合并：${recordingPath}` : `录屏已保存：${recordingPath}`);
+      recordingPath = await promptForRecordingName(recordingPath);
+      queueTranscription(recordingPath, shouldTranscribe && autoTranscribe.checked);
+    } catch (error) {
+      let fallback = nativeSegments[nativeSegments.length - 1];
+      logStatus(`录制片段合并失败，将使用最后一个片段：${error.message || String(error)}`);
+      fallback = await promptForRecordingName(fallback);
+      queueTranscription(fallback, shouldTranscribe && autoTranscribe.checked);
+    }
   } else {
     logStatus('原生录制结束，但没有写入有效文件。');
   }
+  nativeSegments = [];
+  nativeStopIntent = 'stop';
 }
 
-async function startElectronRecording() {
+async function cropRegionRecording(sourcePath) {
+  try {
+    const disp = (displayInfo || []).find(
+      (d) => d.bounds && d.bounds.x === currentCapture.screen?.x && d.bounds.y === currentCapture.screen?.y
+    );
+    if (!disp || !disp.bounds?.width) {
+      logStatus('未能定位框选范围对应的显示器，保留完整录屏。');
+      return sourcePath;
+    }
+    const cssWidth = disp.bounds.width;
+    const cssHeight = disp.bounds.height;
+    const captureWidth = (lastCaptureSize && lastCaptureSize.width) || (disp.size && disp.size.width) || cssWidth;
+    const captureHeight = (lastCaptureSize && lastCaptureSize.height) || (disp.size && disp.size.height) || cssHeight;
+    const sx = captureWidth / cssWidth;
+    const sy = captureHeight / cssHeight;
+    const region = currentCapture.region || {};
+    const relX = (region.x || 0) - (currentCapture.screen?.x || 0);
+    const relY = (region.y || 0) - (currentCapture.screen?.y || 0);
+    const crop = await window.studio.cropRecording({
+      filePath: sourcePath,
+      x: relX * sx,
+      y: relY * sy,
+      width: (region.width || 0) * sx,
+      height: (region.height || 0) * sy
+    });
+    if (crop?.filePath) {
+      logStatus('已按框选范围裁剪录屏区域。');
+      return crop.filePath;
+    }
+  } catch (error) {
+    logStatus(`区域裁剪失败，保留完整录屏：${error.message || String(error)}`);
+  }
+  return sourcePath;
+}
+
+async function startElectronRecording(selectedAudioMode) {
   if (mediaRecorder) return;
   recordingBackend = 'electron';
-  loadSources.disabled = true;
-  logStatus('正在请求录屏权限，请在系统弹窗中选择抖音所在屏幕或窗口。');
+  updateRecordingButtons();
+  logStatus('正在请求录屏权限，请在系统弹窗中选择要录制的屏幕或窗口。');
   let stream;
   try {
     stream = await requestDisplayStream();
   } catch (error) {
-    loadSources.disabled = false;
+    recordingBackend = null;
+    framePrepared = true;
+    updateRecordingButtons();
     throw error;
   }
   const displayStream = stream;
-  const built = await buildRecordingStream(displayStream);
+  try {
+    const vTrack = displayStream.getVideoTracks()[0];
+    const vSettings = (vTrack && vTrack.getSettings && vTrack.getSettings()) || {};
+    lastCaptureSize = { width: vSettings.width || 0, height: vSettings.height || 0 };
+  } catch (_e) {
+    lastCaptureSize = null;
+  }
+  const built = await buildRecordingStream(displayStream, selectedAudioMode);
   stream = built.stream;
 
   const mimeType = chooseMimeType();
@@ -293,7 +1728,9 @@ async function startElectronRecording() {
     await window.studio.finishRecordingFile({ id: activeRecording.id });
     activeRecording = null;
     activeStream = null;
-    loadSources.disabled = false;
+    recordingBackend = null;
+    framePrepared = true;
+    updateRecordingButtons();
     throw error;
   }
   mediaRecorder.ondataavailable = async (event) => {
@@ -320,15 +1757,30 @@ async function startElectronRecording() {
     if (activeStream) activeStream.getTracks().forEach((track) => track.stop());
     activeStream = null;
     mediaRecorder = null;
+    stopAutoStopTimer();
+    recordingLimitSeconds = 0;
+    autoStopTriggered = false;
     stopWidgetTimer();
-    stopRecording.disabled = true;
-    loadSources.disabled = false;
     await window.studio.hideRecordingWidget();
-    recordingBackend = null;
+    await window.studio.hideRecordingFrame();
     if (finished?.filePath && finished.size > 0) {
-      logStatus(`录屏已保存：${finished.filePath}`);
-      transcribe(finished.filePath);
+      let recordingPath = finished.filePath;
+      const wasElectron = recordingBackend === 'electron';
+      const regionCapture = currentCapture?.mode === 'region' ? { ...currentCapture } : null;
+      recordingBackend = null;
+      resetCaptureFrameState();
+      updateRecordingButtons();
+      if (regionCapture && wasElectron) {
+        logStatus('正在按框选范围裁剪录屏区域，请稍候...');
+        recordingPath = await cropRegionRecording(recordingPath);
+      }
+      logStatus(`录屏已保存：${recordingPath}`);
+      recordingPath = await promptForRecordingName(recordingPath);
+      queueTranscription(recordingPath, autoTranscribe.checked);
     } else {
+      recordingBackend = null;
+      resetCaptureFrameState();
+      updateRecordingButtons();
       logStatus('录制结束，但没有写入有效文件。');
     }
   };
@@ -337,18 +1789,38 @@ async function startElectronRecording() {
   });
 
   mediaRecorder.start(1000);
-  stopRecording.disabled = false;
   const hasAudio = stream.getAudioTracks().length > 0;
+  currentAudioLabel = audioModeLabel(built.audioMode);
   logStatus(`录屏文件已开始自动保存：${activeRecording.filePath}`);
   if (built.audioMode === 'system') logStatus('正在录制，已检测到系统音频轨。');
   if (built.audioMode === 'microphone') logStatus('正在录制，音频来自麦克风兜底。');
   if (!hasAudio) logStatus('正在录制，但没有检测到音频轨；停止后将只保存视频，不会转写。');
+  await window.studio.recordingFrameCommand('passthrough');
   await window.studio.showRecordingWidget();
-  startWidgetTimer('recording');
+  await window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
+  updateRecordingButtons();
+  startWidgetTimer('recording', { audioMode: built.audioMode, canPause: true });
+  scheduleAutoStop();
+  logRecordingLimit();
 }
 
 stopRecording.addEventListener('click', () => {
   stopActiveRecording();
+});
+
+pauseRecording.addEventListener('click', () => {
+  pauseActiveRecording();
+});
+
+resumeRecording.addEventListener('click', () => {
+  resumeActiveRecording();
+});
+
+adjustRecordingFrame.addEventListener('click', async () => {
+  if (!recordingBackend) return;
+  adjustingPausedFrame = true;
+  await window.studio.recordingFrameCommand('paused-edit');
+  logStatus('已进入暂停调整模式：可拖动或缩放录屏范围，调整好后点击“继续录制”。');
 });
 
 function elapsedSeconds() {
@@ -356,12 +1828,31 @@ function elapsedSeconds() {
   return Math.max(0, Math.floor((Date.now() - recordingStartedAt - accumulatedPausedMs - pausedMs) / 1000));
 }
 
-function startWidgetTimer(status) {
+function startWidgetTimer(status, extra = {}) {
   stopWidgetTimer();
-  window.studio.recordingWidgetState({ status, elapsed: elapsedSeconds() });
+  window.studio.recordingWidgetState({
+    status,
+    elapsed: elapsedSeconds(),
+    remaining: recordingRemainingSeconds(),
+    audioMode: extra.audioMode || audioMode.value,
+    audioLabel: currentAudioLabel || audioModeLabel(extra.audioMode || audioMode.value),
+    canPause: Boolean(extra.canPause)
+  });
   widgetTimer = setInterval(() => {
-    const currentStatus = recordingBackend === 'electron' && mediaRecorder?.state === 'paused' ? 'paused' : 'recording';
-    window.studio.recordingWidgetState({ status: currentStatus, elapsed: elapsedSeconds() });
+    const currentStatus = (recordingBackend === 'electron' && mediaRecorder?.state === 'paused')
+      || (recordingBackend === 'native' && nativePaused)
+      ? 'paused'
+      : 'recording';
+    const canPause = Boolean(recordingBackend);
+    window.studio.recordingWidgetState({
+      status: currentStatus,
+      elapsed: elapsedSeconds(),
+      remaining: recordingRemainingSeconds(),
+      audioLabel: currentAudioLabel,
+      canPause
+    });
+    scheduleAutoStop();
+    updateRecordingButtons();
   }, 500);
 }
 
@@ -372,28 +1863,95 @@ function stopWidgetTimer() {
 
 function pauseActiveRecording() {
   if (recordingBackend === 'native') {
-    logStatus('原生系统录制暂不支持暂停，请使用停止后重新开始。');
+    if (nativePaused) return;
+    adjustingPausedFrame = false;
+    nativeStopIntent = 'pause';
+    stopAutoStopTimer();
+    window.studio.stopNativeRecording();
+    logStatus('正在暂停原生录制并保存当前片段...');
     return;
   }
   if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
   mediaRecorder.pause();
+  adjustingPausedFrame = false;
   pauseStartedAt = Date.now();
+  stopAutoStopTimer();
   logStatus('录制已暂停。');
-  window.studio.recordingWidgetState({ status: 'paused', elapsed: elapsedSeconds() });
+  updateRecordingButtons();
+  window.studio.recordingFrameCommand('paused');
+  window.studio.recordingWidgetState({ status: 'paused', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
 }
 
-function resumeActiveRecording() {
-  if (recordingBackend === 'native') return;
+async function resumeActiveRecording() {
+  if (recordingBackend === 'native') {
+    if (!nativePaused) return;
+    if (pauseStartedAt) accumulatedPausedMs += Date.now() - pauseStartedAt;
+    pauseStartedAt = 0;
+    nativePaused = false;
+    nativeStopIntent = 'stop';
+    if (captureMode.value === 'region' && adjustingPausedFrame) {
+      currentCapture = await prepareCaptureFrame();
+      logStatus('已应用新的录屏范围，正在继续录制。');
+    } else {
+      logStatus('正在继续录制。');
+    }
+    adjustingPausedFrame = false;
+    startNativeSegment(nativeAudioMode)
+      .then(() => {
+        logStatus('录制已继续。');
+        scheduleAutoStop();
+        updateRecordingButtons();
+        if (currentCapture?.mode === 'window') {
+          window.studio.hideRecordingFrame();
+        } else {
+          window.studio.recordingFrameCommand('passthrough');
+        }
+        window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
+      })
+      .catch((error) => {
+        nativePaused = true;
+        pauseStartedAt = Date.now();
+        updateRecordingButtons();
+        logStatus(`继续录制失败：${error.message || String(error)}`);
+        window.studio.recordingWidgetState({ status: 'paused', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
+      });
+    updateRecordingButtons();
+    return;
+  }
   if (!mediaRecorder || mediaRecorder.state !== 'paused') return;
+  if (adjustingPausedFrame) {
+    logStatus('兼容录制模式暂不支持暂停后切换录屏范围；本次继续沿用原录制范围。');
+  }
+  adjustingPausedFrame = false;
   if (pauseStartedAt) accumulatedPausedMs += Date.now() - pauseStartedAt;
   pauseStartedAt = 0;
   mediaRecorder.resume();
+  scheduleAutoStop();
   logStatus('录制已继续。');
-  window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds() });
+  updateRecordingButtons();
+  window.studio.recordingFrameCommand('passthrough');
+  window.studio.recordingWidgetState({ status: 'recording', elapsed: elapsedSeconds(), remaining: recordingRemainingSeconds(), audioLabel: currentAudioLabel, canPause: true });
 }
 
-function stopActiveRecording() {
+async function stopActiveRecording() {
+  stopAutoStopTimer();
+  adjustingPausedFrame = false;
+  if (framePrepared && !recordingBackend) {
+    await window.studio.stopNativeRecording();
+    await window.studio.hideRecordingFrame();
+    await window.studio.hideRecordingWidget();
+    resetCaptureFrameState();
+    updateRecordingButtons();
+    logStatus('录制已停止。');
+    return;
+  }
   if (recordingBackend === 'native') {
+    nativeStopIntent = 'stop';
+    if (nativePaused) {
+      finishNativeRecording(null, 0, true);
+      logStatus('正在停止原生录制...');
+      return;
+    }
     window.studio.stopNativeRecording();
     logStatus('正在停止原生录制...');
     return;
@@ -405,7 +1963,52 @@ function stopActiveRecording() {
   }
 }
 
+function scheduleAutoStop() {
+  stopAutoStopTimer();
+  if (!recordingBackend || !recordingLimitSeconds || autoStopTriggered) return;
+  if (nativeStopIntent === 'pause') return;
+  const remaining = recordingRemainingSeconds();
+  if (remaining <= 0) {
+    triggerAutoStop();
+    return;
+  }
+  autoStopTimer = setTimeout(triggerAutoStop, Math.max(250, remaining * 1000));
+}
+
+function stopAutoStopTimer() {
+  if (autoStopTimer) clearTimeout(autoStopTimer);
+  autoStopTimer = null;
+}
+
+function triggerAutoStop() {
+  if (!recordingBackend || autoStopTriggered) return;
+  const isPaused = (recordingBackend === 'electron' && mediaRecorder?.state === 'paused')
+    || (recordingBackend === 'native' && (nativePaused || nativeStopIntent === 'pause'));
+  if (isPaused) return;
+  autoStopTriggered = true;
+  logStatus('定时录制时间已到，正在自动停止并进入转写流程...');
+  stopActiveRecording();
+}
+
+function logRecordingLimit() {
+  if (recordingLimitSeconds) {
+    if (recordingDuration.value === 'calculated') {
+      logStatus(`已按视频时长和播放倍速计算录制时长：${recordingLimitLabel(recordingLimitSeconds)}，到点将自动停止。`);
+    } else {
+      logStatus(`已开启定时录制：${recordingLimitLabel(recordingLimitSeconds)}，到点将自动停止。`);
+    }
+  } else {
+    logStatus('录制定时：不限时。');
+  }
+}
+
 window.studio.onRecordingControl((command) => {
+  if (command === 'start' && framePrepared && !recordingBackend) {
+    startRecording().catch((error) => {
+      logStatus(`录屏启动失败：${error.message || String(error)}`);
+      logStatus('请确认系统已允许屏幕录制。如果仍失败，可切换为外部声音录制再试。');
+    });
+  }
   if (command === 'pause') pauseActiveRecording();
   if (command === 'resume') resumeActiveRecording();
   if (command === 'stop') stopActiveRecording();
@@ -415,17 +2018,193 @@ openOutput.addEventListener('click', () => {
   if (outputRoot) window.studio.openPath(outputRoot);
 });
 
+copyRuntimeDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildRuntimeDiagnosticsText());
+  logStatus('运行诊断信息已复制。');
+});
+
+organizer.addEventListener('change', updateOrganizerFields);
+organizeConcurrency.addEventListener('change', () => {
+  localStorage.setItem(ORGANIZE_CONCURRENCY_KEY, String(selectedOrganizeConcurrency()));
+  updateQueueHint();
+  pumpTranscribeQueue();
+});
+startQueuedJobs.addEventListener('click', startWaitingJobs);
+cloudAiProvider.addEventListener('change', applyCloudAiProviderPreset);
+model.addEventListener('change', updateWorkflowSummary);
+style.addEventListener('change', updateWorkflowSummary);
+documentTemplate.addEventListener('change', updateWorkflowSummary);
+subtitleMode.addEventListener('change', updateWorkflowSummary);
+dedupeMode.addEventListener('change', updateWorkflowSummary);
+audioMode.addEventListener('change', () => {
+  audioCheckStatus.textContent = audioMode.value === 'system'
+    ? '系统声音建议在正式录制前先短录 5 秒确认。'
+    : '外部声音使用麦克风，可点击检测声音确认输入。';
+  updateReadyRecordingWidget();
+  updateWorkflowSummary();
+});
+captureMode.addEventListener('change', updateWorkflowSummary);
+recordingBufferSeconds.addEventListener('change', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+glossaryText.addEventListener('input', () => {
+  localStorage.setItem(GLOSSARY_STORAGE_KEY, glossaryText.value);
+});
+testAudioInput.addEventListener('click', testAudioBeforeRecording);
+recordingDuration.addEventListener('change', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+customDurationMinutes.addEventListener('input', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+sourceVideoDuration.addEventListener('input', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+playbackSpeed.addEventListener('change', () => {
+  updateRecordingButtons();
+  updateReadyRecordingWidget();
+});
+chooseOpenClawCommand.addEventListener('click', async () => {
+  const commandPath = await window.studio.chooseOpenClawCommand();
+  if (commandPath) openclawCommand.value = commandPath;
+});
+checkOpenClaw.addEventListener('click', checkOpenClawStatus);
+testOpenClaw.addEventListener('click', testOpenClawStatus);
+copyDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildDiagnosticsText());
+  logStatus('OpenClaw 诊断信息已复制。');
+});
+checkLocalAi.addEventListener('click', checkLocalAiStatus);
+testLocalAi.addEventListener('click', testLocalAiStatus);
+copyLocalAiDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildLocalAiDiagnosticsText());
+  logStatus('本地大模型诊断信息已复制。');
+});
+checkCloudAi.addEventListener('click', checkCloudAiStatus);
+testCloudAi.addEventListener('click', testCloudAiStatus);
+copyCloudAiDiagnostics.addEventListener('click', async () => {
+  await window.studio.copyText(buildCloudAiDiagnosticsText());
+  logStatus('云端大模型诊断信息已复制。');
+});
+captureMode.addEventListener('change', async () => {
+  if (!recordingBackend) {
+    framePrepared = false;
+    selectedWindowCapture = null;
+    await window.studio.hideRecordingFrame();
+    await window.studio.hideRecordingWidget();
+    updateRecordingButtons();
+  }
+});
+
+refreshWindowPicker.addEventListener('click', async () => {
+  await loadWindowPickerOptions('窗口列表已刷新。请选择正在播放内容的窗口。');
+});
+
+cancelWindowPicker.addEventListener('click', () => {
+  windowPickerDialog.returnValue = 'cancel';
+  windowPickerDialog.close();
+});
+updateOrganizerFields();
+renderLocalAiPresets();
+renderCloudAiPresets();
+organizeConcurrency.value = localStorage.getItem(ORGANIZE_CONCURRENCY_KEY) || organizeConcurrency.value || '2';
+glossaryText.value = localStorage.getItem(GLOSSARY_STORAGE_KEY) || '';
+updateWorkflowSummary();
+updateQueueHint();
+
 window.studio.onJobLog((payload) => {
   if (payload.message) logStatus(payload.message);
 });
 
+window.studio.onJobProgress((payload) => {
+  const row = payload.jobId
+    ? document.querySelector(`[data-job-id="${CSS.escape(payload.jobId)}"]`)
+    : null;
+  updateJobProgress(row, payload);
+});
+
+showHelp.addEventListener('click', () => {
+  helpDialog.showModal();
+});
+
+closeHelp.addEventListener('click', () => {
+  helpDialog.close();
+});
+
+showStatusLog.addEventListener('click', renderStatusLogDialog);
+
+closeStatusLog.addEventListener('click', () => {
+  statusLogDialog.close();
+});
+
+copyStatusLog.addEventListener('click', async () => {
+  await window.studio.copyText(loadStatusLog());
+  logStatus('历史状态日志已复制。');
+  statusLogContent.textContent = loadStatusLog() || '暂无历史日志。';
+});
+
+clearStatusLog.addEventListener('click', () => {
+  localStorage.removeItem(STATUS_LOG_KEY);
+  statusLogContent.textContent = '暂无历史日志。';
+  logStatus('历史状态日志已清空。');
+});
+
+closeOrganizerWarning.addEventListener('click', () => {
+  organizerWarningDialog.close('keep');
+});
+
+keepOrganizerWarning.addEventListener('click', () => {
+  organizerWarningDialog.close('keep');
+});
+
+retryOrganizerWarning.addEventListener('click', () => {
+  organizerWarningDialog.close('retry');
+});
+
+cancelTemplateGenerate.addEventListener('click', () => {
+  templateDialog.close('cancel');
+});
+
+confirmTemplateGenerate.addEventListener('click', () => {
+  templateDialog.close('confirm');
+});
+
+nameCancel.addEventListener('click', () => {
+  nameDialog.close('cancel');
+});
+
+nameConfirm.addEventListener('click', () => {
+  nameDialog.close('confirm');
+});
+
+nameDialogInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    nameDialog.close('confirm');
+  }
+});
+
 window.studio.appInfo().then((info) => {
   outputRoot = info.outputRoot;
+  displayInfo = info.displays || [];
+  version.textContent = `v${info.appVersion}`;
   statusBox.textContent = [
     `输出目录：${info.outputRoot}`,
     `Python：${info.python}`,
     `转写脚本：${info.pythonScript}`,
-    '录屏优先使用 macOS 原生系统音频录制。',
-    '首次使用时，macOS 可能要求授予屏幕与系统音频录制权限。'
+    `可选 OpenClaw：${info.openclaw}`,
+    '可选本地大模型直连：默认检测 Ollama http://127.0.0.1:11434，也支持兼容 /v1/chat/completions 的本地服务。',
+    '可选云端大模型 API：支持 OpenAI 兼容接口，API Key 只保存在本机，不写入转写文档。',
+    '文档模板可在转写前选择，也可在转写完成后复用逐字稿换模板生成，不会重新跑 Whisper。',
+    '重复内容去重默认使用普通模式，可处理在线播放卡顿、回放、跳回开头造成的重复片段。',
+    '录屏使用 Electron 兼容录制（macOS 上可用原生录制）。',
+    '系统声音不拾取外部环境；外部声音使用麦克风。',
+    '默认独立运行；选择 OpenClaw、本地大模型或云端大模型 API 时才会调用额外模型。',
+    'OpenClaw 模型留空会使用 OpenClaw 默认模型；本地直连必须填写模型名称。',
+    '换电脑时如检测不到，可复制诊断信息，也可改用本地大模型直连。'
   ].join('\n');
 });

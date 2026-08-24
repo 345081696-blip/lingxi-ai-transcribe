@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>录制范围</title>
+    <link rel="stylesheet" href="./frame.css" />
+  </head>
+  <body>
+    <main id="stage">
+      <section id="frame" class="frame setup">
+        <div class="drag-handle" title="拖动录制范围">按住拖移</div>
+        <div class="label">
+          <strong id="modeText">框选录制</strong>
+          <span id="sizeText">拖动顶部手柄移动范围</span>
+        </div>
+        <button id="fullScreen" class="mode-button" type="button">全屏</button>
+        <button id="regionMode" class="mode-button" type="button" hidden>退出全屏</button>
+        <button id="stopFrame" class="stop-button" type="button">停止</button>
+        <button id="startRecording" class="start-button" type="button">开始录制</button>
+        <i class="resize-hint"></i>
+      </section>
+    </main>
+    <script src="./frame.js"></script>
+  </body>
+</html>

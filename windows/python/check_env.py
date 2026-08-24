@@ -14,7 +14,7 @@ def has_module(name):
 
 print(json.dumps({
     "python": sys.executable,
-    "ffmpeg": shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg",
+    "ffmpeg": shutil.which("ffmpeg") or shutil.which("ffmpeg.exe") or "/opt/homebrew/bin/ffmpeg",
     "faster_whisper": has_module("faster_whisper"),
     "openai_whisper": has_module("whisper"),
     "python_docx": has_module("docx"),
