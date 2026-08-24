@@ -1,6 +1,6 @@
 {
   "name": "local-transcribe-studio",
-  "version": "0.1.0",
+  "version": "0.2.31",
   "description": "Local macOS app for recording/importing media, AI transcription, cleanup, and document export.",
   "main": "src/main.js",
   "author": "Local",
