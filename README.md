@@ -9,6 +9,7 @@ GitHub 仓库名使用 `zero-create-ai-smart-transcribe`，对应中文品牌“
 - 根目录：macOS 电脑版 `零创AI 智能转写器`。
 - `android/lingxi-transcribe-mobile/`：Android 手机版 `灵析 - 零创AI 智能转写器`。
 - `android/lingxi-transcribe-mobile/releases/`：手机版 debug APK 安装包。
+- `windows/`：Windows 电脑版 `零创AI 智能转写器` 源码（Electron + electron-builder/NSIS 打包；安装包见 GitHub Release `v0.2.30`）。
 
 目标是实现两种核心流程：
 
