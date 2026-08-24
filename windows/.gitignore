@@ -1,0 +1,22 @@
+# Python 虚拟环境（含 ffmpeg/onnxruntime 等大体积动态库，勿入库）
+.venv/
+
+# Node 依赖与构建产物
+node_modules/
+dist/
+out/
+release/
+build/
+win-unpacked/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 安装包（作为 GitHub Release 上传，不入库）
+*.exe

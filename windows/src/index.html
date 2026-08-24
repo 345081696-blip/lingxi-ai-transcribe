@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self' blob:; script-src 'self'; style-src 'self';" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>本机语音转写工坊</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <aside class="sidebar">
+        <div>
+          <h1>本机语音转写工坊</h1>
+          <p class="muted">录屏或导入音视频，转成经过清理的文档。</p>
+        </div>
+        <div class="settings">
+          <label>
+            <span>识别语言</span>
+            <select id="language">
+              <option value="zh">中文</option>
+              <option value="en">英文</option>
+              <option value="auto">自动判断</option>
+            </select>
+          </label>
+          <label>
+            <span>模型</span>
+            <select id="model">
+              <option value="small">small：平衡速度</option>
+              <option value="medium">medium：更准</option>
+              <option value="base">base：更快</option>
+            </select>
+          </label>
+          <label>
+            <span>整理方式</span>
+            <select id="style">
+              <option value="clean">清理废话并保留重点</option>
+              <option value="outline">提炼成提纲</option>
+              <option value="verbatim">尽量保留原文</option>
+            </select>
+          </label>
+        </div>
+        <div class="notice">
+          <strong>本机处理</strong>
+          <p>录制内容会边录边保存到输出目录；停止后自动转写。转写脚本优先调用本机 AI Whisper/faster-whisper。</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <div class="toolbar">
+          <button id="pickMedia" class="primary">上传短视频/音频</button>
+          <button id="loadSources">开始录屏转写</button>
+          <button id="stopRecording" class="danger" disabled>停止录制</button>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>任务</h2>
+            <button id="openOutput">打开输出目录</button>
+          </div>
+          <div id="jobs" class="jobs empty">暂无任务</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>状态</h2>
+          </div>
+          <pre id="status">正在检查本机环境...</pre>
+        </section>
+      </section>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

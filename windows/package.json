@@ -1,0 +1,64 @@
+{
+  "name": "local-transcribe-studio",
+  "version": "0.1.0",
+  "description": "Local macOS app for recording/importing media, AI transcription, cleanup, and document export.",
+  "main": "src/main.js",
+  "author": "Local",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --mac dir",
+    "dist": "electron-builder --mac dmg"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "42.3.3",
+    "electron-builder": "26.15.0"
+  },
+  "build": {
+    "appId": "local.transcribe.studio",
+    "productName": "本机语音转写工坊",
+    "directories": {
+      "output": "../../outputs/release"
+    },
+    "files": [
+      "src/**/*",
+      "native/bin/native-recorder",
+      "python/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "python",
+        "to": "python"
+      },
+      {
+        "from": ".venv",
+        "to": ".venv",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "dir"
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "用于录制视频中的声音并转写为文本。",
+        "NSCameraUsageDescription": "用于 macOS 屏幕录制权限流程。",
+        "NSScreenCaptureDescription": "用于录制屏幕画面，并从录制文件中抽取音频转写。"
+      },
+      "hardenedRuntime": false,
+      "identity": null
+    },
+    "dmg": {
+      "artifactName": "本机语音转写工坊-${version}-${arch}.dmg"
+    }
+  }
+}
