@@ -6,6 +6,14 @@ node_modules/
 __pycache__/
 *.pyc
 
+# 构建期准备的独立 Python 运行时（体积大，由构建脚本现备，不入库）
+# 说明：不再使用 .venv —— venv 的 pyvenv.cfg 会写死创建机的解释器绝对路径，
+# 换到没装 Python 的电脑上就报 No Python at ... （Windows 版已踩过，见打包复盘坑20）
+python-standalone/
+
+# 转写模型权重（构建时由 build_mac.sh 拉取，体积大，不入库）
+python/models/
+
 # Build outputs
 dist/
 out/

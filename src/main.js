@@ -402,12 +402,13 @@ function resolveJobDir(filePath, options = {}) {
 }
 
 function resolvePython() {
-  const bundledVenvPython = isDev
-    ? path.join(projectRoot, '.venv', 'bin', 'python')
-    : path.join(process.resourcesPath, '.venv', 'bin', 'python');
+  // 优先使用随包分发的独立 Python（python-standalone）。
+  // 不用 venv：venv 会在 pyvenv.cfg 里写死“创建它的那台机器”的解释器绝对路径，
+  // 换到没装过 Python 的电脑上就会报 No Python at ... （Windows 版已踩过，见打包复盘坑20）。
+  const bundledPython = path.join(projectRoot, 'python-standalone', 'bin', 'python3');
   const candidates = [
     process.env.TRANSCRIBE_STUDIO_PYTHON,
-    bundledVenvPython,
+    bundledPython,
     '/opt/homebrew/bin/python3',
     '/usr/local/bin/python3',
     '/usr/bin/python3',
@@ -417,8 +418,15 @@ function resolvePython() {
 }
 
 function resolveFfmpeg() {
+  // 随包分发的 ffmpeg：开发态在 extra/ffmpeg，打包后由 extraResources 映射到 resources/ffmpeg。
+  // ffprobe 必须跟它放同一目录（transcribe.py 会从 ffmpeg 同目录找 ffprobe）。
+  // 这样换到没装 Homebrew ffmpeg 的电脑上也能转写。
+  const bundled = isDev
+    ? path.join(projectRoot, 'extra', 'ffmpeg', 'ffmpeg')
+    : path.join(projectRoot, 'ffmpeg', 'ffmpeg');
   const candidates = [
     process.env.TRANSCRIBE_STUDIO_FFMPEG,
+    bundled,
     '/opt/homebrew/bin/ffmpeg',
     '/usr/local/bin/ffmpeg',
     'ffmpeg'
