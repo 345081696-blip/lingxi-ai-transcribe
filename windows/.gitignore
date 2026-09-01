@@ -21,5 +21,10 @@ Thumbs.db
 # 安装包（作为 GitHub Release 上传，不入库）
 *.exe
 
+# ffmpeg / ffprobe 二进制例外：Windows 版随包分发必需，必须入库，
+# 否则 clone 下来无法直接打包（换机转写会缺 ffprobe，见打包复盘坑20）
+!extra/ffmpeg/ffmpeg.exe
+!extra/ffmpeg/ffprobe.exe
+
 # 转写模型权重（构建时由 scripts/fetch_models.py 拉取或本地放入，体积大，不入库）
 python/models/
