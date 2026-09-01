@@ -1,6 +1,6 @@
 {
   "name": "local-transcribe-studio",
-  "version": "0.2.33",
+  "version": "0.2.35",
   "description": "本机语音转写工坊：录制/导入音视频，本地 AI 转写、整理并导出文档（Windows 版）。",
   "main": "src/main.js",
   "author": "Local",
@@ -44,8 +44,8 @@
         "to": "python"
       },
       {
-        "from": ".venv",
-        "to": ".venv",
+        "from": "python-embed",
+        "to": "python-embed",
         "filter": [
           "**/*",
           "!**/__pycache__/**",

@@ -426,16 +426,29 @@ function resolveJobDir(filePath, options = {}) {
 
 function resolvePython() {
   const isWin = process.platform === 'win32';
-  const bundledVenvPython = isDev
-    ? path.join(projectRoot, '.venv', isWin ? 'Scripts' : 'bin', isWin ? 'python.exe' : 'python')
-    : path.join(process.resourcesPath, '.venv', isWin ? 'Scripts' : 'bin', isWin ? 'python.exe' : 'python');
+  // 优先使用随包分发的便携 Python（python-embed）。
+  // 不再用 venv：venv 会在 pyvenv.cfg 里写死“创建它的那台机器”的解释器绝对路径，
+  // 换到没装过 Python 的电脑上就会报 No Python at ... ，便携版无此绑定，路径无关。
+  const portablePython = path.join(projectRoot, 'python-embed', isWin ? 'python.exe' : 'bin/python');
   const candidates = [
     process.env.TRANSCRIBE_STUDIO_PYTHON,
-    bundledVenvPython,
+    portablePython,
     isWin ? 'python' : 'python3',
     isWin ? 'python3' : 'python'
   ].filter(Boolean);
   return candidates.find((candidate) => candidate === 'python3' || candidate === 'python' || fs.existsSync(candidate)) || (isWin ? 'python' : 'python3');
+}
+
+// Python 启动失败时，把英文底层报错翻译成用户看得懂的提示。
+function toUserFriendlyPythonError(error) {
+  const message = String((error && error.message) || error || '');
+  if (/No Python at/i.test(message)) {
+    return new Error('程序自带的 Python 运行环境不完整，无法开始转写。请重新安装本程序。');
+  }
+  if (/ENOENT/.test(message)) {
+    return new Error('找不到 Python 运行环境，无法开始转写。请重新安装本程序。');
+  }
+  return error;
 }
 
 function resolveFfmpeg() {
@@ -1278,16 +1291,21 @@ ipcMain.handle('transcribe-media', async (event, options) => {
   };
   let pendingLogLine = '';
   sendToWebContents(event.sender, 'job-log', { jobId, filePath, message: `开始处理：${path.basename(filePath)}` });
-  const result = await runTrackedCommand(jobId, resolvePython(), args, (text) => {
-    pendingLogLine += text;
-    const lines = pendingLogLine.split(/\r?\n/);
-    pendingLogLine = lines.pop() || '';
-    for (const line of lines.map((item) => item.trim()).filter(Boolean)) {
-      handleProgressLine(line);
-    }
-  }, options.organizer === 'cloudai' && options.cloudAiApiKey
-    ? { TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY: String(options.cloudAiApiKey) }
-    : {});
+  let result;
+  try {
+    result = await runTrackedCommand(jobId, resolvePython(), args, (text) => {
+      pendingLogLine += text;
+      const lines = pendingLogLine.split(/\r?\n/);
+      pendingLogLine = lines.pop() || '';
+      for (const line of lines.map((item) => item.trim()).filter(Boolean)) {
+        handleProgressLine(line);
+      }
+    }, options.organizer === 'cloudai' && options.cloudAiApiKey
+      ? { TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY: String(options.cloudAiApiKey) }
+      : {});
+  } catch (error) {
+    throw toUserFriendlyPythonError(error);
+  }
   handleProgressLine(pendingLogLine.trim());
 
   const lines = result.stdout.trim().split(/\r?\n/).filter(Boolean);
