@@ -572,7 +572,7 @@ def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_
             lines.append("错词修正：" + "；".join(replacements[:40]))
         glossary_terms = "\n".join(lines) if lines else "无"
     return textwrap.dedent(f"""
-    你是“零创AI 智能转写器”的文档整理助手。
+    你是“零析AI 转写”的文档整理助手。
     请基于下面的语音转写内容进行二次整理，并参考视频画面字幕。
     要求：
     1. 全部输出简体中文。

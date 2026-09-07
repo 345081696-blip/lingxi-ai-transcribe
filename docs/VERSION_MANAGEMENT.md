@@ -4,8 +4,8 @@
 
 ## 仓库结构
 
-- `./`：macOS 电脑版，应用名 `零创AI 智能转写器`。
-- `android/lingxi-transcribe-mobile/`：Android 手机版，应用名 `灵析`，副标题 `零创AI 智能转写器`。
+- `./`：macOS 电脑版，应用名 `零析AI 转写`。
+- `android/lingxi-transcribe-mobile/`：Android 手机版，应用名 `零析AI 转写`，副标题 `零析AI 转写`。
 
 ## 版本标签
 
@@ -17,8 +17,8 @@
 以后不以本地散落源码为准，只以 GitHub 为准。
 
 ```bash
-git clone https://github.com/345081696-blip/zero-create-ai-smart-transcribe.git
-cd zero-create-ai-smart-transcribe
+git clone https://github.com/345081696-blip/lingxi-ai-transcribe.git
+cd lingxi-ai-transcribe
 git pull origin main
 ```
 

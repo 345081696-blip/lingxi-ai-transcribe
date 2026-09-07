@@ -216,7 +216,7 @@ private fun Header(state: TranscribeUiState) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(
-                text = "灵析",
+                text = "零析AI 转写",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Black,
                 color = Ink,
@@ -224,7 +224,7 @@ private fun Header(state: TranscribeUiState) {
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "零创AI 智能转写器 · v${BuildConfig.VERSION_NAME.removeSuffix("-lingxi")}",
+                text = "零析AI 转写 · v${BuildConfig.VERSION_NAME.removeSuffix("-lingxi")}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MutedInk,
                 maxLines = 1,
@@ -501,7 +501,7 @@ private fun GlossaryPanel(
             minLines = 3,
             maxLines = 6,
             placeholder = {
-                Text("每行一条：\n灵析\n错误词=正确词\nOPC=OBC")
+                Text("每行一条：\n零析AI 转写\n错误词=正确词\nOPC=OBC")
             },
         )
         Text(
@@ -955,7 +955,7 @@ private fun shareAudio(context: Context, audioResult: AudioExtractionResult) {
 }
 
 private fun openLingxiDownloadsFolder(context: Context, folderName: String) {
-    val documentId = "primary:Download/灵析/$folderName"
+    val documentId = "primary:Download/零析AI 转写/$folderName"
     val uri = DocumentsContract.buildDocumentUri(
         "com.android.externalstorage.documents",
         documentId,
@@ -967,7 +967,7 @@ private fun openLingxiDownloadsFolder(context: Context, folderName: String) {
     runCatching {
         context.startActivity(Intent.createChooser(intent, "打开文件夹"))
     }.onFailure {
-        Toast.makeText(context, "请到系统文件管理器打开 Downloads/灵析/$folderName", Toast.LENGTH_LONG).show()
+        Toast.makeText(context, "请到系统文件管理器打开 Downloads/零析AI 转写/$folderName", Toast.LENGTH_LONG).show()
     }
 }
 

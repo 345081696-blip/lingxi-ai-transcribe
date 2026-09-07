@@ -217,7 +217,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update {
                     it.copy(
                         phase = WorkPhase.AudioReady,
-                        statusText = "音频提取完成，已导出到 Downloads/灵析/音频",
+                        statusText = "音频提取完成，已导出到 Downloads/零析AI 转写/音频",
                         audioResult = result,
                         publicExportHint = result.publicPathHint,
                         errorText = null,
@@ -290,7 +290,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update {
                     it.copy(
                         phase = if (it.audioResult != null) WorkPhase.AudioReady else WorkPhase.VideoReady,
-                        statusText = "字幕辅助捕捉完成，已导出到 Downloads/灵析/字幕辅助",
+                        statusText = "字幕辅助捕捉完成，已导出到 Downloads/零析AI 转写/字幕辅助",
                         subtitleAssistResult = result,
                         publicExportHint = result.publicPathHint,
                         subtitleProgress = 1f,
@@ -392,7 +392,7 @@ class TranscribeViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update {
                     it.copy(
                         phase = WorkPhase.Transcribed,
-                        statusText = "转写完成，已导出到 Downloads/灵析/文稿",
+                        statusText = "转写完成，已导出到 Downloads/零析AI 转写/文稿",
                         transcriptionResult = result,
                         transcriptExports = exported,
                         history = history,

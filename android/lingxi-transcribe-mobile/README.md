@@ -1,4 +1,4 @@
-# 灵析 - 零创AI 智能转写器 Android
+# 零析AI 转写 Android
 
 ## 项目定位
 
@@ -18,9 +18,9 @@
 
 ## 当前状态
 
-- 包名：`com.zerocreate.transcribemobile`
-- 应用名：`灵析`
-- 副标题：`零创AI 智能转写器`
+- 包名：`com.lingchuang.lingxi`
+- 应用名：`零析AI 转写`
+- 副标题：`零析AI 转写`
 - 当前版本：`v0.3.2-lingxi`
 - 最低版本：Android 8.0，`minSdk 26`
 - 目标版本：`targetSdk 35`
@@ -55,15 +55,15 @@
 - 专有词与错词纠正，支持 `错词=正确词`。
 - 导出 `TXT` 和 `DOCX`。
 - 公共导出目录：
-  - `Downloads/灵析/文稿`
-  - `Downloads/灵析/音频`
-  - `Downloads/灵析/字幕辅助`
+  - `Downloads/零析AI 转写/文稿`
+  - `Downloads/零析AI 转写/音频`
+  - `Downloads/零析AI 转写/字幕辅助`
 - 首页文件夹入口：`文稿文件夹`、`音频文件夹`。
 
 ## 安装包
 
 ```text
-releases/灵析-零创AI智能转写器-v0.3.2-debug.apk
+releases/零析AI 转写-v0.3.2-debug.apk
 ```
 
 ## 构建方式
@@ -85,7 +85,7 @@ app/build/outputs/apk/debug/app-debug.apk
 - 设备：Xiaomi `21091116AC`，Android 13。
 - `v0.3.2` 已通过 `:app:assembleDebug`。
 - `v0.3.2` 已通过 `adb install -r` 覆盖安装。
-- 首页显示 `零创AI 智能转写器 · v0.3.2`。
+- 首页显示 `零析AI 转写 · v0.3.2`。
 - DOCX zip 结构校验通过。
 - WAV 输出为 `16000Hz / mono / 16-bit`。
 - 字幕辅助 OCR 已做二次降噪，过滤短视频平台 UI 文案。

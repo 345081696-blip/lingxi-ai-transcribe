@@ -1,5 +1,5 @@
 #!/bin/bash
-# macOS 版「零创AI 智能转写器」构建脚本
+# macOS 版「零析AI 转写」构建脚本
 #
 # 作用：准备独立 Python 运行时 + 转写依赖 + ffmpeg/ffprobe + 模型，然后打出 dmg。
 #

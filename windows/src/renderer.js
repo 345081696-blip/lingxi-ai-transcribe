@@ -409,7 +409,7 @@ function rememberCurrentCloudAiPreset() {
 function buildDiagnosticsText() {
   const info = lastOpenClawInfo || {};
   return [
-    `零创AI 智能转写器：${version.textContent || ''}`,
+    `零析AI 转写：${version.textContent || ''}`,
     `智能整理：${organizer.value}`,
     `OpenClaw 命令输入：${openclawCommand.value.trim() || '自动检测'}`,
     `OpenClaw 命令实际：${info.command || '未检测'}`,
@@ -428,7 +428,7 @@ function buildDiagnosticsText() {
 function buildLocalAiDiagnosticsText() {
   const info = lastLocalAiInfo || {};
   return [
-    `零创AI 智能转写器：${version.textContent || ''}`,
+    `零析AI 转写：${version.textContent || ''}`,
     `智能整理：${organizer.value}`,
     `本地模型地址：${localAiBaseUrl.value.trim() || info.baseUrl || '默认 http://127.0.0.1:11434'}`,
     `本地模型名称：${localAiModel.value.trim() || info.selectedModel || '未填写'}`,
@@ -440,7 +440,7 @@ function buildLocalAiDiagnosticsText() {
 function buildCloudAiDiagnosticsText() {
   const info = lastCloudAiInfo || {};
   return [
-    `零创AI 智能转写器：${version.textContent || ''}`,
+    `零析AI 转写：${version.textContent || ''}`,
     `智能整理：${organizer.value}`,
     `云端 API 地址：${cloudAiBaseUrl.value.trim() || info.baseUrl || '未填写'}`,
     `云端模型名称：${cloudAiModel.value.trim() || info.selectedModel || '未填写'}`,
@@ -452,7 +452,7 @@ function buildCloudAiDiagnosticsText() {
 
 function buildRuntimeDiagnosticsText() {
   return [
-    `零创AI 智能转写器：${version.textContent || ''}`,
+    `零析AI 转写：${version.textContent || ''}`,
     `识别语言：${language.value}`,
     `Whisper 模型：${model.value}`,
     `整理方式：${style.value}`,

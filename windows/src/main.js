@@ -14,7 +14,7 @@ const projectRoot = isDev ? path.join(__dirname, '..') : process.resourcesPath;
 const pythonScript = path.join(projectRoot, 'python', 'transcribe.py');
 const nativeRecorderPath = path.join(projectRoot, 'native', 'bin', 'native-recorder');
 const outputRoot = path.join(app.getPath('documents'), 'TranscribeStudio');
-const productName = '零创AI 智能转写器';
+const productName = '零析AI 转写';
 const appVersion = app.getVersion();
 const progressPrefix = '__LC_PROGRESS__';
 const mediaExtensions = new Set(['.mp4', '.mov', '.m4v', '.mkv', '.webm', '.avi', '.mp3', '.m4a', '.wav', '.aac', '.flac', '.ogg']);
@@ -689,7 +689,7 @@ async function checkOpenClawStatus(options = {}) {
 async function testOpenClawOrganizer(options = {}) {
   const command = resolveOpenClawCommand(options.command || '');
   const model = (options.model || '').trim();
-  const prompt = '请只回复：零创AI 智能转写器测试成功';
+  const prompt = '请只回复：零析AI 转写测试成功';
   const args = ['infer', 'model', 'run', '--gateway', '--json', '--prompt', prompt];
   if (model) args.push('--model', model);
   const result = await runCommandWithTimeout(command, args, 45000);
@@ -803,7 +803,7 @@ async function testLocalAiOrganizer(options = {}) {
       model,
       messages: [
         { role: 'system', content: '你是简洁的中文助手。' },
-        { role: 'user', content: '请只回复：零创AI 智能转写器测试成功' }
+        { role: 'user', content: '请只回复：零析AI 转写测试成功' }
       ],
       temperature: 0.2,
       stream: false
@@ -872,7 +872,7 @@ async function testCloudAiOrganizer(options = {}) {
       model,
       messages: [
         { role: 'system', content: '你是简洁的中文助手。' },
-        { role: 'user', content: '请只回复：零创AI 智能转写器云端模型测试成功' }
+        { role: 'user', content: '请只回复：零析AI 转写云端模型测试成功' }
       ],
       temperature: 0.2,
       stream: false

@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.zerocreate.transcribemobile"
+        applicationId = "com.lingchuang.lingxi"
         minSdk = 26
         targetSdk = 35
         versionCode = 6

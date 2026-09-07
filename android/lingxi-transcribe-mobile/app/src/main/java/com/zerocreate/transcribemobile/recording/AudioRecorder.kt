@@ -17,7 +17,7 @@ class AudioRecorder(private val context: Context) {
     fun start(): VideoFileInfo {
         stopSilently()
         val dir = File(context.filesDir, "recordings").apply { mkdirs() }
-        val name = "灵析录音-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.CHINA).format(Date())}.m4a"
+        val name = "零析AI 转写录音-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.CHINA).format(Date())}.m4a"
         val file = File(dir, name)
 
         val mediaRecorder = MediaRecorder().apply {

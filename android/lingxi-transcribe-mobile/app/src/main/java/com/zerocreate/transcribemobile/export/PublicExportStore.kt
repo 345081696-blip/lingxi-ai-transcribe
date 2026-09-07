@@ -25,7 +25,7 @@ class PublicExportStore(private val context: Context) {
         require(source.exists() && source.length() > 0) { "导出源文件不存在或为空" }
 
         val safeName = displayName.safeFileName().ifBlank { source.name.safeFileName() }
-        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/灵析/${bucket.folderName}"
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/零析AI 转写/${bucket.folderName}"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val resolver = context.contentResolver
@@ -51,11 +51,11 @@ class PublicExportStore(private val context: Context) {
             return PublicExportResult(safeName, uri.toString(), relativePath)
         }
 
-        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "灵析/${bucket.folderName}")
+        val outputDir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "零析AI 转写/${bucket.folderName}")
             .apply { mkdirs() }
         val outputFile = File(outputDir, safeName)
         source.copyTo(outputFile, overwrite = true)
-        return PublicExportResult(safeName, Uri.fromFile(outputFile).toString(), "Downloads/灵析/${bucket.folderName}")
+        return PublicExportResult(safeName, Uri.fromFile(outputFile).toString(), "Downloads/零析AI 转写/${bucket.folderName}")
     }
 
     private fun String.safeFileName(): String {

@@ -1,4 +1,4 @@
-# 本机语音转写工坊
+# 零析AI 转写
 
 这是一个本机 Electron 应用（Windows / macOS 共用核心；录制在 Windows 上走 Electron 兼容录制）。目标是实现两种流程：
 

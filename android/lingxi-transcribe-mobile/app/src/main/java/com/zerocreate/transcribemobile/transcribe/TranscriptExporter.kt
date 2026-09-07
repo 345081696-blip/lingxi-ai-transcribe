@@ -65,8 +65,8 @@ class TranscriptExporter(context: Context) {
         }
 
         return buildString {
-            appendLine("灵析转写文稿")
-            appendLine("副标题：零创AI 智能转写器")
+            appendLine("零析AI 转写文稿")
+            appendLine("副标题：零析AI 转写")
             appendLine("素材：$videoName")
             appendLine("生成时间：$generatedAt")
             appendLine("识别语言：${language.ifBlank { "auto" }}")
@@ -129,7 +129,7 @@ class TranscriptExporter(context: Context) {
     private fun String.toDocumentXml(): String {
         val body = lineSequence().joinToString("") { line ->
             val paragraphStyle = if (
-                line == "灵析转写文稿" ||
+                line == "零析AI 转写文稿" ||
                 line == "一、字幕辅助修正版" ||
                 line == "二、Whisper 原始识别" ||
                 line == "三、字幕辅助参考" ||
