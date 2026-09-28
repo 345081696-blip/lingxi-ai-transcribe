@@ -454,7 +454,7 @@ function buildRuntimeDiagnosticsText() {
   return [
     `零析AI 转写：${version.textContent || ''}`,
     `识别语言：${language.value}`,
-    `Whisper 模型：${model.value}`,
+    `识别模型：${model.value === 'dialect' ? '方言模式（Qwen3-ASR）' : 'Whisper ' + model.value}`,
     `整理方式：${style.value}`,
     `文档模板：${DOCUMENT_TEMPLATE_LABELS[documentTemplate.value] || documentTemplate.value}`,
     `字幕辅助：${subtitleMode.value}`,
@@ -720,9 +720,11 @@ function updateWorkflowSummary() {
   workflowSummary.textContent = `${audioText} · ${captureText} · ${dedupeText} · ${template}`;
   expectedFinish.textContent = expectedFinishLabel(limit);
   audioSummary.textContent = `声音：${audioText}`;
-  modelHint.textContent = model.value === 'medium'
-    ? 'medium 更准但更慢，适合重要课程、三倍速或口音较重内容。'
-    : (model.value === 'base' ? 'base 更快但准确率较低，适合短内容快速预览。' : 'small 适合多数直播；倍速高或内容重要时建议 medium。');
+  modelHint.textContent = model.value === 'dialect'
+    ? '方言模式：使用 Qwen3-ASR 识别昆明话、云南话等方言，方言词准确率高，但速度较慢（约 1.5 倍音频时长）。'
+    : (model.value === 'medium'
+      ? 'medium 更准但更慢，适合重要课程、三倍速或口音较重内容。'
+      : (model.value === 'base' ? 'base 更快但准确率较低，适合短内容快速预览。' : 'small 适合多数直播；倍速高或内容重要时建议 medium。'));
   dedupeHint.textContent = dedupeMode.value === 'strong'
     ? '强力去重适合重复严重的录制，但可能误删主播刻意重复强调。'
     : (dedupeMode.value === 'off' ? '已关闭去重，卡顿回放造成的重复内容会保留。' : '普通去重默认移除卡顿回放造成的重复片段。');

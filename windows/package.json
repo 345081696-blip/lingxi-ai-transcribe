@@ -1,7 +1,7 @@
 {
   "name": "lingxi-ai-transcribe-win",
-  "version": "0.2.35",
-  "description": "零析AI 转写（Windows 版）：录制/导入音视频，本地 AI 转写、整理并导出文档。",
+  "version": "0.2.36",
+  "description": "零创智能转写器（Windows 版）：录制/导入音视频，本地 AI 转写、整理并导出文档。",
   "main": "src/main.js",
   "author": "Local",
   "license": "UNLICENSED",
@@ -24,7 +24,7 @@
   },
   "build": {
     "appId": "com.lingchuang.lingxi",
-    "productName": "零析AI 转写",
+    "productName": "零创智能转写器",
     "directories": {
       "output": "../../outputs/release"
     },
@@ -62,7 +62,7 @@
       "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
-      "artifactName": "零析AI 转写-${version}-${arch}.${ext}",
+      "artifactName": "零创智能转写器-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     },

@@ -14,7 +14,7 @@ const projectRoot = isDev ? path.join(__dirname, '..') : process.resourcesPath;
 const pythonScript = path.join(projectRoot, 'python', 'transcribe.py');
 const nativeRecorderPath = path.join(projectRoot, 'native', 'bin', 'native-recorder');
 const outputRoot = path.join(app.getPath('documents'), 'TranscribeStudio');
-const productName = '零析AI 转写';
+const productName = '零创智能转写器';
 const appVersion = app.getVersion();
 const progressPrefix = '__LC_PROGRESS__';
 const mediaExtensions = new Set(['.mp4', '.mov', '.m4v', '.mkv', '.webm', '.avi', '.mp3', '.m4a', '.wav', '.aac', '.flac', '.ogg']);
@@ -468,6 +468,23 @@ function resolveFfmpeg() {
   return candidates.find((candidate) => candidate === 'ffmpeg' || candidate === 'ffmpeg.exe' || fs.existsSync(candidate)) || 'ffmpeg';
 }
 
+function resolveFfprobe() {
+  const isWin = process.platform === 'win32';
+  // transcribe.py 的 extract_audio() 强制要求 ffprobe，缺失会直接抛错。
+  // 打包随附的 ffprobe 与 ffmpeg 同目录，优先用它，避免依赖系统 PATH。
+  const bundled = isWin
+    ? path.join(process.resourcesPath || '', 'ffmpeg', 'ffprobe.exe')
+    : path.join(process.resourcesPath || '', 'ffmpeg', 'ffprobe');
+  const candidates = [
+    process.env.TRANSCRIBE_STUDIO_FFPROBE,
+    bundled,
+    isWin ? 'ffprobe.exe' : '/opt/homebrew/bin/ffprobe',
+    isWin ? 'ffprobe' : '/usr/local/bin/ffprobe',
+    'ffprobe'
+  ].filter(Boolean);
+  return candidates.find((candidate) => candidate === 'ffprobe' || candidate === 'ffprobe.exe' || fs.existsSync(candidate)) || 'ffprobe';
+}
+
 function commandEnv() {
   const isWin = process.platform === 'win32';
   const sep = isWin ? ';' : ':';
@@ -479,9 +496,15 @@ function commandEnv() {
     defaultPaths
   ].filter(Boolean).flatMap((entry) => entry.split(sep));
   const uniquePath = [...new Set(pathEntries)].join(sep);
+  // 关键：把 ffmpeg / ffprobe 的绝对路径注入子进程环境。
+  // transcribe.py 通过 TRANSCRIBE_STUDIO_FFMPEG / TRANSCRIBE_STUDIO_FFPROBE 查找这两个二进制，
+  // 若不带这两个变量、且系统 PATH 里没有 ffmpeg、site-packages 里也没有 imageio-ffmpeg，
+  // 脚本会以「未找到 ffmpeg / ffprobe」直接失败，导致转写完全不可用。
   return {
     ...process.env,
-    PATH: uniquePath
+    PATH: uniquePath,
+    TRANSCRIBE_STUDIO_FFMPEG: resolveFfmpeg(),
+    TRANSCRIBE_STUDIO_FFPROBE: resolveFfprobe()
   };
 }
 
@@ -689,7 +712,7 @@ async function checkOpenClawStatus(options = {}) {
 async function testOpenClawOrganizer(options = {}) {
   const command = resolveOpenClawCommand(options.command || '');
   const model = (options.model || '').trim();
-  const prompt = '请只回复：零析AI 转写测试成功';
+  const prompt = '请只回复：零创智能转写器测试成功';
   const args = ['infer', 'model', 'run', '--gateway', '--json', '--prompt', prompt];
   if (model) args.push('--model', model);
   const result = await runCommandWithTimeout(command, args, 45000);
@@ -803,7 +826,7 @@ async function testLocalAiOrganizer(options = {}) {
       model,
       messages: [
         { role: 'system', content: '你是简洁的中文助手。' },
-        { role: 'user', content: '请只回复：零析AI 转写测试成功' }
+        { role: 'user', content: '请只回复：零创智能转写器测试成功' }
       ],
       temperature: 0.2,
       stream: false
@@ -872,7 +895,7 @@ async function testCloudAiOrganizer(options = {}) {
       model,
       messages: [
         { role: 'system', content: '你是简洁的中文助手。' },
-        { role: 'user', content: '请只回复：零析AI 转写云端模型测试成功' }
+        { role: 'user', content: '请只回复：零创智能转写器云端模型测试成功' }
       ],
       temperature: 0.2,
       stream: false

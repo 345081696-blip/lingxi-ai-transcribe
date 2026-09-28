@@ -4,8 +4,13 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
+import textwrap
+import urllib.error
+import urllib.request
+from difflib import SequenceMatcher
 from pathlib import Path
 
 from docx import Document
@@ -17,14 +22,100 @@ FILLER_PATTERNS = [
     r"\b(um+|uh+|erm+|like you know)\b",
 ]
 
+FALLBACK_T2S = str.maketrans({
+    "開": "开", "發": "发", "這": "这", "個": "个", "結": "结", "果": "果", "沒": "没",
+    "為": "为", "實": "实", "驗": "验", "證": "证", "關": "关", "鍵": "键",
+    "題": "题", "願": "愿", "壯": "壮", "談": "谈", "論": "论", "據": "据",
+    "瘋": "疯", "點": "点", "應": "应", "講": "讲", "觀": "观", "別": "别",
+    "線": "线", "買": "买", "殘": "残", "酷": "酷", "該": "该", "訪": "访",
+})
+
+_OPENCC_CONVERTER = None
+
+
+SUBTITLE_REGION_FILTER = "crop=iw:ih*0.32:0:ih*0.62,scale=1280:-1,format=gray"
+PROGRESS_PREFIX = "__LC_PROGRESS__"
+
+DOCUMENT_TEMPLATES = {
+    "general": {
+        "label": "通用整理",
+        "hint": "输出一份适合阅读和存档的结构化整理稿，包含主题概述、重点内容、结论和行动建议。"
+    },
+    "live_recap": {
+        "label": "直播复盘",
+        "hint": "按“核心观点、精彩案例、观众提问、成交话术、待优化项、可复用素材”组织内容。适合知识付费讲师直播后复盘。"
+    },
+    "course_notes": {
+        "label": "课程笔记",
+        "hint": "按“知识图谱、核心概念、方法论步骤、关键案例、易错点、课后行动”组织内容。"
+    },
+    "material_extract": {
+        "label": "素材提取",
+        "hint": "按“可切片片段、爆款开头、情绪高光、金句、短视频标题、剪辑建议”组织内容。"
+    },
+    "sales_script": {
+        "label": "成交话术",
+        "hint": "按“用户痛点、信任建立、价值呈现、异议处理、成交话术、可复用表达”组织内容。"
+    },
+    "quotes": {
+        "label": "金句提取",
+        "hint": "提取有传播价值的金句，并补充适用场景和原文上下文。不要为了凑数量编造金句。"
+    },
+}
+
 
 def emit(message):
     print(message, file=sys.stderr, flush=True)
 
 
+def emit_progress(stage, percent, message="", current=None, total=None):
+    payload = {
+        "stage": stage,
+        "percent": max(0, min(100, int(percent))),
+        "message": message,
+    }
+    if current is not None:
+        payload["current"] = float(current)
+    if total is not None:
+        payload["total"] = float(total)
+    print(f"{PROGRESS_PREFIX}{json.dumps(payload, ensure_ascii=False)}", file=sys.stderr, flush=True)
+
+
+def to_simplified(text):
+    global _OPENCC_CONVERTER
+    if not text:
+        return text
+    try:
+        if _OPENCC_CONVERTER is None:
+            from opencc import OpenCC
+            _OPENCC_CONVERTER = OpenCC("t2s")
+        return _OPENCC_CONVERTER.convert(text)
+    except Exception:
+        return text.translate(FALLBACK_T2S)
+
+
+def bundled_binary(name):
+    """在程序自带目录里找 ffmpeg/ffprobe（Windows 为 .exe）。
+    脚本位于 resources/python/，自带二进制在 resources/ffmpeg/。"""
+    suffixes = [".exe", ""] if os.name == "nt" else ["", ".exe"]
+    roots = [
+        Path(__file__).resolve().parents[1],
+        Path(__file__).resolve().parent,
+        Path(sys.executable).resolve().parents[1],
+    ]
+    for root in roots:
+        for folder in ("ffmpeg", "bin", "native/bin"):
+            for suffix in suffixes:
+                candidate = root / folder / f"{name}{suffix}"
+                if candidate.is_file():
+                    return str(candidate)
+    return None
+
+
 def find_ffmpeg():
     candidates = [
         os.environ.get("TRANSCRIBE_STUDIO_FFMPEG"),
+        bundled_binary("ffmpeg"),
         "/opt/homebrew/bin/ffmpeg",
         "/usr/local/bin/ffmpeg",
         shutil.which("ffmpeg"),
@@ -33,7 +124,6 @@ def find_ffmpeg():
     for candidate in candidates:
         if candidate and Path(candidate).exists():
             return candidate
-    # 兜底：使用 venv 内的 imageio-ffmpeg 二进制（Windows 无需单独安装 ffmpeg）
     try:
         import imageio_ffmpeg
         exe = imageio_ffmpeg.get_ffmpeg_exe()
@@ -41,25 +131,27 @@ def find_ffmpeg():
             return exe
     except Exception:
         pass
-    raise RuntimeError("未找到 ffmpeg。请在 venv 中执行 pip install imageio-ffmpeg，或直接安装 ffmpeg 并设置 TRANSCRIBE_STUDIO_FFMPEG。")
+    raise RuntimeError(
+        "未找到 ffmpeg。请设置环境变量 TRANSCRIBE_STUDIO_FFMPEG，"
+        "或把 ffmpeg.exe 放到程序 resources/ffmpeg 目录下。"
+    )
 
 
 def find_ffprobe(ffmpeg):
     env_path = os.environ.get("TRANSCRIBE_STUDIO_FFPROBE")
     candidates = [
         env_path,
+        bundled_binary("ffprobe"),
         str(Path(ffmpeg).with_name("ffprobe")) if ffmpeg else None,
         str(Path(ffmpeg).with_name("ffprobe.exe")) if ffmpeg else None,
         "/opt/homebrew/bin/ffprobe",
         "/usr/local/bin/ffprobe",
-        "/usr/bin/ffprobe",
         shutil.which("ffprobe"),
         shutil.which("ffprobe.exe"),
     ]
     for candidate in candidates:
         if candidate and Path(candidate).exists():
             return candidate
-    # imageio-ffmpeg 目录自带 ffprobe
     try:
         import imageio_ffmpeg
         base = Path(imageio_ffmpeg.get_ffmpeg_exe())
@@ -73,6 +165,7 @@ def find_ffprobe(ffmpeg):
 
 def extract_audio(ffmpeg, input_path, output_path):
     emit("正在抽取音频...")
+    emit_progress("extract", 8, "正在抽取音频...")
     probe_cmd = [
         find_ffprobe(ffmpeg),
         "-v",
@@ -88,8 +181,8 @@ def extract_audio(ffmpeg, input_path, output_path):
     probe = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     if not probe.stdout.strip():
         raise RuntimeError(
-            "录制文件没有音频轨，无法转写。请在 macOS 的“屏幕与系统音频录制”和“麦克风”中授权本应用；"
-            "如果仍无系统声音，请打开电脑外放，让应用使用麦克风兜底录音。"
+            "录制文件没有音频轨，无法转写。请确认录制时已开启麦克风或系统声音采集；"
+            "如果仍无声音，请打开电脑外放，让应用使用麦克风兜底录音。"
         )
     cmd = [
         ffmpeg,
@@ -106,65 +199,466 @@ def extract_audio(ffmpeg, input_path, output_path):
         str(output_path),
     ]
     subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    emit_progress("extract", 18, "音频抽取完成。")
+
+
+def media_duration(ffprobe, input_path):
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(input_path),
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        return max(0.0, float(result.stdout.strip()))
+    except Exception:
+        return 0.0
+
+
+def has_video_stream(ffprobe, input_path):
+    cmd = [
+        ffprobe,
+        "-v",
+        "error",
+        "-select_streams",
+        "v",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "csv=p=0",
+        str(input_path),
+    ]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return bool(result.stdout.strip())
+
+
+def resolve_subtitle_ocr_bin():
+    candidates = [
+        os.environ.get("TRANSCRIBE_STUDIO_SUBTITLE_OCR"),
+        str(Path(__file__).resolve().parents[1] / "native" / "bin" / "subtitle-ocr"),
+        str(Path(__file__).resolve().parents[1] / "native" / "bin" / "subtitle-ocr.exe"),
+        str(Path(sys.executable).resolve().parents[1] / "native" / "bin" / "subtitle-ocr"),
+        str(Path(sys.executable).resolve().parents[1] / "native" / "bin" / "subtitle-ocr.exe"),
+    ]
+    for candidate in candidates:
+        if candidate and Path(candidate).exists():
+            return candidate
+    return ""
+
+
+def extract_subtitle_frames(ffmpeg, ffprobe, input_path, output_dir, interval=1.2, max_frames=180):
+    if not has_video_stream(ffprobe, input_path):
+        return []
+    duration = media_duration(ffprobe, input_path)
+    if duration <= 0:
+        return []
+    frame_dir = output_dir / "subtitle_frames"
+    frame_dir.mkdir(parents=True, exist_ok=True)
+    count = min(max_frames, max(1, int(duration / interval)))
+    timestamps = [min(duration - 0.1, index * interval + 0.2) for index in range(count)]
+    frames = []
+    emit("正在抽取画面字幕参考帧...")
+    for index, timestamp in enumerate(timestamps):
+        frame_path = frame_dir / f"subtitle-{index:04d}.png"
+        cmd = [
+            ffmpeg,
+            "-y",
+            "-ss",
+            f"{timestamp:.2f}",
+            "-i",
+            str(input_path),
+            "-frames:v",
+            "1",
+            "-vf",
+            SUBTITLE_REGION_FILTER,
+            str(frame_path),
+        ]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if result.returncode == 0 and frame_path.exists():
+            frames.append({"time": timestamp, "path": frame_path})
+    return frames
+
+
+def clean_subtitle_text(text):
+    text = to_simplified(text)
+    text = re.sub(r"\s+", "", text)
+    text = re.sub(r"[|｜_~·•●]+", "", text)
+    text = re.sub(r"^[0-9:：.,，。\\-— ]+", "", text)
+    text = re.sub(r"[^\w\u4e00-\u9fff，。！？、：；“”‘’（）《》,.!?;:() -]+", "", text)
+    return text.strip()
+
+
+def similarity(a, b):
+    if not a or not b:
+        return 0.0
+    aset = set(a)
+    bset = set(b)
+    return len(aset & bset) / max(1, len(aset | bset))
+
+
+def normalized_for_dedupe(text):
+    text = normalize_text(text)
+    text = re.sub(r"[，。！？、：；,.!?;:\s]+", "", text)
+    return text
+
+
+def sequence_similarity(a, b):
+    if not a or not b:
+        return 0.0
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def dedupe_segments(segments, mode):
+    if mode == "off":
+        return segments, {"mode": mode, "removed": 0, "notes": []}
+    window = 8 if mode == "normal" else 24
+    threshold = 0.92 if mode == "normal" else 0.84
+    min_chars = 8 if mode == "normal" else 6
+    kept = []
+    removed = []
+    notes = []
+    for segment in segments:
+        current = normalized_for_dedupe(segment.get("text", ""))
+        if len(current) < min_chars:
+            kept.append(segment)
+            continue
+        duplicate_of = None
+        for previous in reversed(kept[-window:]):
+            prior = normalized_for_dedupe(previous.get("text", ""))
+            if len(prior) < min_chars:
+                continue
+            same_text = current == prior
+            close_text = sequence_similarity(current, prior) >= threshold
+            overlap_text = len(current) >= 16 and (current in prior or prior in current)
+            if same_text or close_text or overlap_text:
+                duplicate_of = previous
+                break
+        if duplicate_of:
+            removed.append(segment)
+            if len(notes) < 12:
+                notes.append(
+                    f"[{int(segment['start'] // 60):02d}:{int(segment['start'] % 60):02d}] 疑似重复：{segment.get('text', '')[:80]}"
+                )
+            continue
+        kept.append(segment)
+    if removed:
+        emit(f"重复内容去重：已移除 {len(removed)} 条疑似重复片段（模式：{mode}）。")
+        emit_progress("dedupe", 78, f"重复内容去重完成：移除 {len(removed)} 条疑似重复片段。")
+    gap_notes = detect_timeline_gaps(kept)
+    return kept, {"mode": mode, "removed": len(removed), "notes": notes, "gap_notes": gap_notes}
+
+
+def detect_timeline_gaps(segments):
+    notes = []
+    previous = None
+    for segment in segments:
+        if previous is not None:
+            gap = float(segment.get("start", 0)) - float(previous.get("end", previous.get("start", 0)))
+            if gap >= 8:
+                notes.append(
+                    f"[{int(previous.get('end', 0) // 60):02d}:{int(previous.get('end', 0) % 60):02d}] 到 "
+                    f"[{int(segment.get('start', 0) // 60):02d}:{int(segment.get('start', 0) % 60):02d}] 存在约 {int(gap)} 秒断点"
+                )
+                if len(notes) >= 12:
+                    break
+        previous = segment
+    return notes
+
+
+def recognize_subtitles(frames, output_dir):
+    ocr_bin = resolve_subtitle_ocr_bin()
+    raw_path = output_dir / "subtitle_ocr_raw.json"
+    subtitle_path = output_dir / "字幕参考.txt"
+    if not frames or not ocr_bin:
+        raw_path.write_text("[]", encoding="utf-8")
+        subtitle_path.write_text("", encoding="utf-8")
+        return []
+
+    emit("正在进行视频字幕 OCR 识别...")
+    emit_progress("subtitle", 76, "正在进行视频字幕 OCR 识别...")
+    results = []
+    batch_size = 24
+    for start in range(0, len(frames), batch_size):
+        batch = frames[start:start + batch_size]
+        cmd = [ocr_bin, *[str(item["path"]) for item in batch]]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180)
+        if result.returncode != 0:
+            emit(f"字幕 OCR 批次失败：{result.stderr.strip() or result.stdout.strip()}")
+            continue
+        try:
+            payload = json.loads(result.stdout or "[]")
+        except json.JSONDecodeError:
+            payload = []
+        by_path = {item.get("path"): item.get("text", "") for item in payload if isinstance(item, dict)}
+        for item in batch:
+            text = clean_subtitle_text(by_path.get(str(item["path"]), ""))
+            if len(text) >= 2:
+                results.append({"time": item["time"], "text": text})
+
+    merged = []
+    for item in results:
+        if merged and (item["text"] == merged[-1]["text"] or similarity(item["text"], merged[-1]["text"]) > 0.82):
+            continue
+        merged.append(item)
+
+    raw_path.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+    subtitle_lines = [
+        f"[{int(item['time'] // 60):02d}:{int(item['time'] % 60):02d}] {item['text']}"
+        for item in merged
+    ]
+    subtitle_path.write_text("\n".join(subtitle_lines), encoding="utf-8")
+    emit_progress("subtitle", 84, f"字幕辅助识别完成：{len(merged)} 条参考字幕。")
+    return merged
 
 
 def resolve_model_ref(model_name):
-    # 若安装包自带了本地模型目录（python/models/<name>），优先用本地，离线可用；
-    # 否则返回原始名称，交由 faster-whisper 联网下载。
+    """安装包自带 python/models/<name> 时优先用本地模型，离线可用；
+    否则返回原始名称，交给 faster-whisper 联网下载。"""
+    if os.path.isabs(model_name) and Path(model_name).is_dir():
+        return model_name, True
     local = Path(__file__).resolve().parent / "models" / model_name
     if local.is_dir() and any(local.iterdir()):
         return str(local), True
     return model_name, False
 
 
+DIALECT_MODEL_NAMES = {"dialect", "qwen", "qwen3-asr", "方言", "方言模式"}
+DIALECT_HOTWORDS = []
+
+
+def is_dialect_model(model_name):
+    """是否走方言引擎：模型名指定 dialect，或环境变量 / 「#方言」指令开启。"""
+    if str(model_name or "").strip().lower() in DIALECT_MODEL_NAMES:
+        return True
+    flag = os.environ.get("TRANSCRIBE_STUDIO_DIALECT", "").strip().lower()
+    return flag in ("1", "true", "yes", "on")
+
+
+def split_dialect_directive(glossary_text):
+    """从「专有词」文本框里识别 #方言 指令。
+    返回 (去掉指令行的词表, 热词列表)；没写指令时第二项为 None。"""
+    text = glossary_text or ""
+    if not text.strip():
+        return text, None
+    enabled = False
+    kept_lines = []
+    hotwords = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.lower() in ("#方言", "#方言模式", "#dialect"):
+            enabled = True
+            continue
+        kept_lines.append(line)
+        if stripped and not stripped.startswith("#"):
+            word = stripped.split("=")[-1].strip()
+            if word:
+                hotwords.append(word)
+    if not enabled:
+        return text, None
+    return "\n".join(kept_lines), hotwords
+
+
+def load_dialect_engine(model_name, language, hotwords=None):
+    """方言引擎：调用 D:\\Qwen3ASR 下的 Qwen3-ASR worker（支持昆明话/云南话等方言）。
+    worker 负责分块、方言识别和时间戳，此处只做桥接与进度转发。"""
+    import threading
+    import tempfile
+
+    worker_script = os.environ.get("TRANSCRIBE_STUDIO_DIALECT_WORKER") or r"D:\Qwen3ASR\asr_worker.py"
+    worker_python = os.environ.get("TRANSCRIBE_STUDIO_DIALECT_PYTHON") or r"D:\Qwen3ASR\venv\Scripts\python.exe"
+
+    def run(audio_path, duration=0):
+        if not Path(worker_script).is_file():
+            raise RuntimeError(
+                "找不到方言引擎脚本：" + worker_script +
+                "\n请确认 D:\\Qwen3ASR 目录完整（asr_worker.py、models、venv）。"
+            )
+        if not Path(worker_python).is_file():
+            raise RuntimeError("找不到方言引擎运行环境：" + worker_python)
+
+        emit("[语音转文字] 使用方言引擎：Qwen3-ASR（支持昆明话/云南话等方言）")
+        emit_progress("transcribe", 24, "正在加载方言模型...", current=0,
+                      total=duration if duration > 0 else None)
+
+        result_file = Path(tempfile.gettempdir()) / "transcribe_studio_dialect.json"
+        if result_file.exists():
+            try:
+                result_file.unlink()
+            except OSError:
+                pass
+
+        prompt = (os.environ.get("TRANSCRIBE_STUDIO_DIALECT_PROMPT") or "").strip()
+        if not prompt:
+            prompt = "云南昆明方言采访录音，说话人讲昆明话。"
+            if hotwords:
+                prompt += "可能出现的专有词：" + "、".join(hotwords[:40]) + "。"
+
+        try:
+            ffmpeg_path = find_ffmpeg()
+        except Exception:
+            ffmpeg_path = ""
+
+        command = [
+            worker_python, worker_script,
+            "--audio", str(audio_path),
+            "--out", str(result_file),
+            "--language", str(language or "zh"),
+            "--prompt", prompt,
+            "--ffmpeg", str(ffmpeg_path or ""),
+        ]
+        creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            creationflags=creation_flags,
+        )
+
+        error_lines = []
+
+        def pump_stderr():
+            for line in process.stderr:
+                line = line.rstrip()
+                if line:
+                    error_lines.append(line)
+                    if len(error_lines) > 120:
+                        del error_lines[0]
+
+        pump = threading.Thread(target=pump_stderr, daemon=True)
+        pump.start()
+
+        for line in process.stdout:
+            line = line.strip()
+            if not line.startswith("##PROGRESS##"):
+                continue
+            percent_text, _, message = line[len("##PROGRESS##"):].strip().partition("|")
+            try:
+                inner = float(percent_text)
+            except ValueError:
+                continue
+            current = duration * inner / 100.0 if duration > 0 else 0
+            emit_progress(
+                "transcribe",
+                24 + int(50 * inner / 100.0),
+                message.strip() or "正在进行方言语音识别...",
+                current=min(current, duration) if duration > 0 else None,
+                total=duration if duration > 0 else None,
+            )
+
+        process.wait()
+        pump.join(timeout=3)
+
+        if process.returncode != 0 or not result_file.is_file():
+            raise RuntimeError(
+                "方言引擎执行失败（退出码 " + str(process.returncode) + "）：\n" +
+                "\n".join(error_lines[-8:])
+            )
+
+        payload = json.loads(result_file.read_text(encoding="utf-8"))
+        segments = []
+        for item in payload.get("segments", []):
+            text = str(item.get("text") or "").strip()
+            if not text:
+                continue
+            segments.append({
+                "start": float(item.get("start", 0) or 0),
+                "end": float(item.get("end", 0) or 0),
+                "text": text,
+            })
+        if not segments:
+            raise RuntimeError("方言引擎没有识别到内容：\n" + "\n".join(error_lines[-5:]))
+
+        emit("方言引擎识别完成，共 " + str(len(segments)) + " 句。")
+        emit_progress("transcribe", 74, "方言语音识别完成。",
+                      current=duration, total=duration if duration > 0 else None)
+        return segments, payload.get("language") or (language or "zh")
+
+    return run
+
+
 def load_engine(model_name, language):
-    model_ref, is_local = resolve_model_ref(model_name)
+    if is_dialect_model(model_name):
+        return load_dialect_engine(model_name, language, DIALECT_HOTWORDS)
     try:
         from faster_whisper import WhisperModel
 
-        def run(audio_path):
-            emit(f"使用 faster-whisper 模型：{model_ref}" + ("（本地自带）" if is_local else ""))
+        def run(audio_path, duration=0):
+            model_ref, is_local = resolve_model_ref(model_name)
+            emit(f"[语音转文字] 使用 faster-whisper 模型：{model_ref}" + ("（本地自带）" if is_local else ""))
+            emit_progress("transcribe", 24, "正在加载语音识别模型...")
             try:
                 model = WhisperModel(model_ref, device="auto", compute_type="auto")
-            except Exception as local_err:
-                if is_local:
-                    emit(f"本地模型加载失败（{local_err}），改联网下载：{model_name}")
-                    model = WhisperModel(model_name, device="auto", compute_type="auto")
-                else:
+            except Exception as local_error:
+                if not is_local:
                     raise
+                emit(f"本地模型加载失败（{local_error}），改联网下载：{model_name}")
+                model = WhisperModel(model_name, device="auto", compute_type="auto")
             kwargs = {"vad_filter": True}
             if language and language != "auto":
                 kwargs["language"] = language
             segments, info = model.transcribe(str(audio_path), **kwargs)
-            return [
-                {
+            results = []
+            last_percent = 0
+            for segment in segments:
+                item = {
                     "start": float(segment.start),
                     "end": float(segment.end),
                     "text": segment.text.strip(),
                 }
-                for segment in segments
-            ], getattr(info, "language", language or "auto")
+                results.append(item)
+                if duration > 0:
+                    percent = 25 + min(48, int((item["end"] / duration) * 48))
+                    if percent != last_percent:
+                        last_percent = percent
+                        emit_progress(
+                            "transcribe",
+                            percent,
+                            "正在进行 AI 语音识别...",
+                            current=min(item["end"], duration),
+                            total=duration,
+                        )
+            emit_progress("transcribe", 74, "AI 语音识别完成。", current=duration, total=duration if duration > 0 else None)
+            return results, getattr(info, "language", language or "auto")
 
         return run
     except Exception as first_error:
         try:
             import whisper
 
-            def run(audio_path):
-                emit(f"使用 openai-whisper 模型：{model_name}")
+            def run(audio_path, duration=0):
+                emit(f"[语音转文字] 使用 openai-whisper 模型：{model_name}")
+                emit_progress("transcribe", 24, "正在加载语音识别模型...")
                 model = whisper.load_model(model_name)
                 kwargs = {}
                 if language and language != "auto":
                     kwargs["language"] = language
                 result = model.transcribe(str(audio_path), **kwargs)
-                return [
-                    {
+                segments = []
+                for segment in result.get("segments", []):
+                    item = {
                         "start": float(segment.get("start", 0)),
                         "end": float(segment.get("end", 0)),
                         "text": segment.get("text", "").strip(),
                     }
-                    for segment in result.get("segments", [])
-                ], result.get("language", language or "auto")
+                    segments.append(item)
+                    if duration > 0:
+                        emit_progress(
+                            "transcribe",
+                            25 + min(48, int((item["end"] / duration) * 48)),
+                            "正在进行 AI 语音识别...",
+                            current=min(item["end"], duration),
+                            total=duration,
+                        )
+                emit_progress("transcribe", 74, "AI 语音识别完成。", current=duration, total=duration if duration > 0 else None)
+                return segments, result.get("language", language or "auto")
 
             return run
         except Exception as second_error:
@@ -177,12 +671,13 @@ def load_engine(model_name, language):
 
 
 def normalize_text(text):
+    text = to_simplified(text)
     text = re.sub(r"\s+", " ", text).strip()
     for pattern in FILLER_PATTERNS:
         text = re.sub(pattern, "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s+", " ", text).strip()
     text = re.sub(r"([。！？!?])\1+", r"\1", text)
-    return text
+    return to_simplified(text)
 
 
 def clean_segments(segments, style):
@@ -197,12 +692,53 @@ def clean_segments(segments, style):
     return cleaned
 
 
+def parse_glossary(text):
+    terms = []
+    replacements = []
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if "=" in line:
+            wrong, right = [part.strip() for part in line.split("=", 1)]
+            if wrong and right:
+                replacements.append((wrong, right))
+        else:
+            terms.append(line)
+    return terms, replacements
+
+
+def apply_glossary(segments, glossary_text):
+    terms, replacements = parse_glossary(glossary_text)
+    if not replacements:
+        return segments, {"terms": terms, "replacements": [], "applied": 0}
+    applied = 0
+    updated = []
+    for segment in segments:
+        text = segment.get("text", "")
+        original = text
+        for wrong, right in replacements:
+            text = text.replace(wrong, right)
+        if text != original:
+            applied += 1
+        updated.append({**segment, "text": text})
+    return updated, {
+        "terms": terms,
+        "replacements": [f"{wrong}=>{right}" for wrong, right in replacements],
+        "applied": applied,
+    }
+
+
 def split_sentences(text):
     parts = re.split(r"(?<=[。！？!?])\s*", text)
     return [part.strip() for part in parts if part.strip()]
 
 
-def build_document(cleaned, style):
+def template_label(document_template):
+    return DOCUMENT_TEMPLATES.get(document_template, DOCUMENT_TEMPLATES["general"])["label"]
+
+
+def build_document(cleaned, style, document_template="general"):
     full_text = "\n".join(segment["text"] for segment in cleaned).strip()
     sentences = split_sentences(full_text)
     if style == "outline":
@@ -218,28 +754,434 @@ def build_document(cleaned, style):
             if sentence not in important:
                 important.append(sentence)
         body = "\n".join(important)
+    if document_template != "general" and body:
+        label = template_label(document_template)
+        body = f"## {label}\n\n{body}"
     return body.strip() or full_text
 
 
-def write_outputs(output_dir, source_path, cleaned, language, style):
-    title = source_path.stem
-    body = build_document(cleaned, style)
+def build_organizer_prompt(body, timeline, style, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    style_hint = {
+        "clean": "清理废话、口头禅、重复句和笑声，保留重点信息，输出适合阅读的简体中文整理稿。",
+        "outline": "提炼成有层次的简体中文提纲，保留关键观点、结论和行动项。",
+        "verbatim": "尽量保留原意和顺序，只修正识别错误、繁体字、废话和明显重复。"
+    }.get(style, "整理成简体中文文档。")
+    template = DOCUMENT_TEMPLATES.get(document_template, DOCUMENT_TEMPLATES["general"])
+    source = body or timeline
+    source = source[:12000]
+    subtitle_block = subtitle_reference[:6000] if subtitle_reference else "无"
+    dedupe_hint = "未开启。"
+    if dedupe_report:
+        removed = int(dedupe_report.get("removed") or 0)
+        mode = dedupe_report.get("mode") or "off"
+        notes = "\n".join(dedupe_report.get("notes") or [])
+        dedupe_hint = f"去重模式：{mode}；已预处理移除疑似重复片段：{removed} 条。"
+        if notes:
+            dedupe_hint = f"{dedupe_hint}\n疑似重复片段示例：\n{notes}"
+        gaps = "\n".join(dedupe_report.get("gap_notes") or [])
+        if gaps:
+            dedupe_hint = f"{dedupe_hint}\n疑似播放断点：\n{gaps}"
+    glossary_terms = "无"
+    if glossary_report:
+        terms = glossary_report.get("terms") or []
+        replacements = glossary_report.get("replacements") or []
+        lines = []
+        if terms:
+            lines.append("专有词：" + "、".join(terms[:40]))
+        if replacements:
+            lines.append("错词修正：" + "；".join(replacements[:40]))
+        glossary_terms = "\n".join(lines) if lines else "无"
+    return textwrap.dedent(f"""
+    你是“零析AI 转写”的文档整理助手。
+    请基于下面的语音转写内容进行二次整理，并参考视频画面字幕。
+    要求：
+    1. 全部输出简体中文。
+    2. {style_hint}
+    3. 文档模板：{template["label"]}。{template["hint"]}
+    4. 删除无意义语气词、笑声、掌声、背景音乐提示和明显废话。
+    5. 不要编造原文没有的信息。
+    6. 如果语音识别和画面字幕冲突，优先根据上下文判断；专有名词、人名、课程术语可优先参考字幕。
+    7. 优先保留和修正下面“专有词与错词修正”中的术语。
+    8. 如果发现在线播放卡顿、回放、跳回开头导致的重复段落，只保留一次；但对主播有意强调的重点不要过度删除。
+    9. 如果发现上下文明显断裂、缺少承接，保留可确认内容，并在末尾用一句话标注“可能存在因播放卡顿造成的内容缺失”。
+    10. 只输出最终整理稿，不要解释你的处理过程。
+
+    专有词与错词修正：
+    {glossary_terms}
+
+    重复/缺失处理参考：
+    {dedupe_hint}
+
+    语音转写内容：
+    {source}
+
+    画面字幕参考：
+    {subtitle_block}
+    """).strip()
+
+
+def run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
+    cmd = [
+        openclaw_bin,
+        "infer",
+        "model",
+        "run",
+        "--gateway",
+        "--json",
+        "--prompt",
+        prompt,
+    ]
+    if openclaw_model:
+        cmd.extend(["--model", openclaw_model])
+    emit(f"[智能整理] 正在调用 OpenClaw/Qwen 增强整理（模型：{openclaw_model or '默认'}）...")
+    emit_progress("organize", 86, "正在调用 OpenClaw/Qwen 增强整理...")
+    env = os.environ.copy()
+    extra_path = "/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+    env["PATH"] = f"{env.get('PATH', '')}:{extra_path}" if env.get("PATH") else extra_path
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=600, env=env)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "OpenClaw 整理失败").strip())
+    text = parse_openclaw_output(result.stdout)
+    text = to_simplified(text).strip()
+    if not text:
+        raise RuntimeError("OpenClaw 没有返回有效整理内容。")
+    return text
+
+
+def run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    if not local_ai_base_url:
+        raise RuntimeError("本地大模型地址为空。")
+    if not local_ai_model:
+        raise RuntimeError("本地大模型名称为空。")
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
+    base_url = local_ai_base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        endpoint = f"{base_url}/chat/completions"
+    else:
+        endpoint = f"{base_url}/v1/chat/completions"
+    payload = {
+        "model": local_ai_model,
+        "messages": [
+            {"role": "system", "content": "你是严谨的中文转写文档整理助手，只输出最终整理稿。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "stream": False
+    }
+    emit(f"[智能整理] 正在调用本地大模型直连整理（模型：{local_ai_model}）...")
+    attempts = [600, 900, 1200]
+    errors = []
+    for index, timeout in enumerate(attempts, start=1):
+        emit(f"本地大模型第 {index}/3 次请求，最长等待 {timeout // 60} 分钟...")
+        emit_progress("organize", 84 + index, f"本地大模型第 {index}/3 次请求：{local_ai_model}")
+        request = urllib.request.Request(
+            endpoint,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                data = response.read().decode("utf-8", errors="replace")
+            response_payload = json.loads(data or "{}")
+            text = to_simplified(extract_text(response_payload)).strip()
+            if not text:
+                raise RuntimeError("本地大模型没有返回有效整理内容。")
+            return text
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", errors="replace") if error.fp else ""
+            errors.append(f"第 {index} 次：HTTP {error.code} {detail[:800]}")
+        except (urllib.error.URLError, socket.timeout, TimeoutError, json.JSONDecodeError, RuntimeError) as error:
+            errors.append(f"第 {index} 次：{error}")
+    raise RuntimeError("本地大模型连续 3 次未返回有效整理内容；" + "；".join(errors))
+
+
+def chat_completion_endpoint(base_url):
+    value = (base_url or "").rstrip("/")
+    if not value:
+        return ""
+    if value.endswith("/v1"):
+        return f"{value}/chat/completions"
+    return f"{value}/v1/chat/completions"
+
+
+def run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    api_key = os.environ.get("TRANSCRIBE_STUDIO_CLOUD_AI_API_KEY", "").strip()
+    if not cloud_ai_base_url:
+        raise RuntimeError("云端 API 地址为空。")
+    if not cloud_ai_model:
+        raise RuntimeError("云端模型名称为空。")
+    if not api_key:
+        raise RuntimeError("云端 API Key 为空。")
+    prompt = build_organizer_prompt(body, timeline, style, subtitle_reference, dedupe_report, document_template, glossary_report)
+    endpoint = chat_completion_endpoint(cloud_ai_base_url)
+    payload = {
+        "model": cloud_ai_model,
+        "messages": [
+            {"role": "system", "content": "你是严谨的中文转写文档整理助手，只输出最终整理稿。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.2,
+        "stream": False
+    }
+    emit(f"[智能整理] 正在调用云端大模型 API 整理（模型：{cloud_ai_model}）...")
+    emit_progress("organize", 86, f"正在调用云端大模型整理：{cloud_ai_model}")
+    request = urllib.request.Request(
+        endpoint,
+        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+        method="POST"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            data = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as error:
+        detail = error.read().decode("utf-8", errors="replace") if error.fp else ""
+        raise RuntimeError(f"云端大模型请求失败：HTTP {error.code} {detail[:800]}") from error
+    payload = json.loads(data or "{}")
+    text = to_simplified(extract_text(payload)).strip()
+    if not text:
+        raise RuntimeError("云端大模型没有返回有效整理内容。")
+    return text
+
+
+def parse_openclaw_output(stdout):
+    stripped = stdout.strip()
+    if not stripped:
+        return ""
+    try:
+        payload = json.loads(stripped)
+        return extract_text(payload)
+    except json.JSONDecodeError:
+        pass
+    for line in reversed([line.strip() for line in stripped.splitlines() if line.strip()]):
+        try:
+            payload = json.loads(line)
+            text = extract_text(payload)
+            if text:
+                return text
+        except json.JSONDecodeError:
+            continue
+    return stripped
+
+
+def extract_text(value):
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("text", "outputs", "output", "content", "message", "reply", "result", "data"):
+            if key in value:
+                text = extract_text(value[key])
+                if text:
+                    return text
+        choices = value.get("choices")
+        if isinstance(choices, list):
+            return extract_text(choices)
+        if isinstance(value.get("message"), dict):
+            return extract_text(value["message"])
+    if isinstance(value, list):
+        parts = [extract_text(item) for item in value]
+        return "\n".join(part for part in parts if part)
+    return ""
+
+
+def organize_body(body, timeline, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitle_reference="", dedupe_report=None, document_template="general", glossary_report=None):
+    report = {
+        "organizer_requested": organizer,
+        "organizer_actual": "local",
+        "style": style,
+        "document_template": document_template,
+        "openclaw_bin": openclaw_bin if organizer == "openclaw" else "",
+        "openclaw_model": openclaw_model if organizer == "openclaw" else "",
+        "local_ai_base_url": local_ai_base_url if organizer == "localai" else "",
+        "local_ai_model": local_ai_model if organizer == "localai" else "",
+        "cloud_ai_base_url": cloud_ai_base_url if organizer == "cloudai" else "",
+        "cloud_ai_model": cloud_ai_model if organizer == "cloudai" else "",
+        "failure_reason": "",
+    }
+    if organizer not in ("openclaw", "localai", "cloudai"):
+        emit_progress("organize", 88, "正在进行本机智能整理...")
+        return body, "local", report
+    if organizer == "openclaw":
+        try:
+            enhanced = run_openclaw_organizer(body, timeline, style, openclaw_bin, openclaw_model, subtitle_reference, dedupe_report, document_template, glossary_report)
+            emit_progress("organize", 92, "OpenClaw/Qwen 增强整理完成。")
+            report["organizer_actual"] = "openclaw"
+            return enhanced, "openclaw", report
+        except Exception as error:
+            emit(f"OpenClaw 增强整理不可用，已保留本机整理结果：{error}")
+            emit_progress("organize", 90, "OpenClaw 不可用，已回退本机整理。")
+            report["organizer_actual"] = "local-fallback"
+            report["failure_reason"] = str(error)
+            return body, "local-fallback", report
+    if organizer == "cloudai":
+        try:
+            enhanced = run_cloud_ai_organizer(body, timeline, style, cloud_ai_base_url, cloud_ai_model, subtitle_reference, dedupe_report, document_template, glossary_report)
+            emit_progress("organize", 92, "云端大模型增强整理完成。")
+            report["organizer_actual"] = "cloudai"
+            return enhanced, "cloudai", report
+        except Exception as error:
+            emit(f"云端大模型增强整理不可用，已保留本机整理结果：{error}")
+            emit_progress("organize", 90, "云端大模型不可用，已回退本机整理。")
+            report["organizer_actual"] = "cloudai-fallback"
+            report["failure_reason"] = str(error)
+            return body, "cloudai-fallback", report
+    try:
+        enhanced = run_local_ai_organizer(body, timeline, style, local_ai_base_url, local_ai_model, subtitle_reference, dedupe_report, document_template, glossary_report)
+        emit_progress("organize", 92, "本地大模型增强整理完成。")
+        report["organizer_actual"] = "localai"
+        return enhanced, "localai", report
+    except Exception as error:
+        emit(f"本地大模型增强整理不可用，已保留本机整理结果：{error}")
+        emit_progress("organize", 90, "本地大模型不可用，已回退本机整理。")
+        report["organizer_actual"] = "localai-fallback"
+        report["failure_reason"] = str(error)
+        return body, "localai-fallback", report
+
+
+def report_label(value):
+    labels = {
+        "local": "本机规则整理",
+        "openclaw": "OpenClaw/Qwen 增强整理",
+        "localai": "本地大模型直连",
+        "cloudai": "云端大模型 API",
+        "local-fallback": "OpenClaw 失败后回退本机规则整理",
+        "localai-fallback": "本地大模型失败后回退本机规则整理",
+        "cloudai-fallback": "云端大模型失败后回退本机规则整理",
+    }
+    return labels.get(value, value or "未记录")
+
+
+def build_processing_report_lines(language, style, organizer_report, dedupe_report=None, subtitle_count=0, glossary_report=None):
+    lines = [
+        f"识别语言：{language}",
+        f"整理方式：{style}",
+        f"文档模板：{template_label(organizer_report.get('document_template') or 'general')}",
+        f"智能整理请求：{report_label(organizer_report.get('organizer_requested'))}",
+        f"智能整理实际：{report_label(organizer_report.get('organizer_actual'))}",
+    ]
+    if organizer_report.get("local_ai_base_url"):
+        lines.append(f"本地模型地址：{organizer_report.get('local_ai_base_url')}")
+    if organizer_report.get("local_ai_model"):
+        lines.append(f"本地模型名称：{organizer_report.get('local_ai_model')}")
+    if organizer_report.get("openclaw_bin"):
+        lines.append(f"OpenClaw 命令：{organizer_report.get('openclaw_bin')}")
+    if organizer_report.get("openclaw_model"):
+        lines.append(f"OpenClaw 模型：{organizer_report.get('openclaw_model')}")
+    if organizer_report.get("cloud_ai_base_url"):
+        lines.append(f"云端 API 地址：{organizer_report.get('cloud_ai_base_url')}")
+    if organizer_report.get("cloud_ai_model"):
+        lines.append(f"云端模型名称：{organizer_report.get('cloud_ai_model')}")
+    if organizer_report.get("failure_reason"):
+        lines.append(f"失败原因：{organizer_report.get('failure_reason')}")
+    else:
+        lines.append("失败原因：无")
+    if dedupe_report:
+        lines.append(f"重复内容去重：{dedupe_report.get('mode')}；移除 {dedupe_report.get('removed', 0)} 条")
+        if dedupe_report.get("gap_notes"):
+            lines.append(f"疑似播放断点：{len(dedupe_report.get('gap_notes') or [])} 处")
+    if glossary_report:
+        lines.append(f"专有词数量：{len(glossary_report.get('terms') or [])}；错词修正命中：{glossary_report.get('applied', 0)} 段")
+    lines.append(f"字幕辅助识别数量：{subtitle_count} 条")
+    return [to_simplified(line) for line in lines]
+
+
+def srt_timestamp(seconds):
+    value = max(0, float(seconds or 0))
+    hours = int(value // 3600)
+    minutes = int((value % 3600) // 60)
+    secs = int(value % 60)
+    millis = int((value - int(value)) * 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+
+
+def write_srt(output_path, segments):
+    lines = []
+    for index, item in enumerate(segments, start=1):
+        lines.extend([
+            str(index),
+            f"{srt_timestamp(item.get('start'))} --> {srt_timestamp(item.get('end'))}",
+            item.get("text", ""),
+            "",
+        ])
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def write_outputs(output_dir, source_path, cleaned, language, style, organizer, openclaw_bin, openclaw_model, local_ai_base_url="", local_ai_model="", cloud_ai_base_url="", cloud_ai_model="", subtitles=None, dedupe_report=None, document_template="general", glossary_report=None):
+    emit_progress("document", 90, "正在生成转写文档...")
+    title = to_simplified(source_path.stem)
+    cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
     timeline = "\n".join(
         f"[{int(item['start'] // 60):02d}:{int(item['start'] % 60):02d}] {item['text']}"
         for item in cleaned
     )
+    subtitle_reference = "\n".join(
+        f"[{int(item['time'] // 60):02d}:{int(item['time'] % 60):02d}] {item['text']}"
+        for item in (subtitles or [])
+    )
+    body = to_simplified(build_document(cleaned, style, document_template))
+    if subtitle_reference and organizer not in ("openclaw", "localai", "cloudai"):
+        body = f"{body}\n\n## 字幕参考校正\n\n{subtitle_reference}".strip()
+    body, organizer_used, organizer_report = organize_body(
+        body,
+        timeline,
+        style,
+        organizer,
+        openclaw_bin,
+        openclaw_model,
+        local_ai_base_url,
+        local_ai_model,
+        cloud_ai_base_url,
+        cloud_ai_model,
+        subtitle_reference,
+        dedupe_report,
+        document_template,
+        glossary_report
+    )
+    body = to_simplified(body)
+    dedupe_summary = ""
+    if dedupe_report and dedupe_report.get("mode") != "off":
+        notes = "\n".join(dedupe_report.get("notes") or [])
+        gaps = "\n".join(dedupe_report.get("gap_notes") or [])
+        dedupe_summary = (
+            f"模式：{dedupe_report.get('mode')}；已移除疑似重复片段：{dedupe_report.get('removed', 0)} 条。"
+            + (f"\n\n{notes}" if notes else "")
+            + (f"\n\n疑似播放断点：\n{gaps}" if gaps else "")
+        )
+    report_lines = build_processing_report_lines(
+        language,
+        style,
+        organizer_report,
+        dedupe_report,
+        len(subtitles or []),
+        glossary_report
+    )
+    md_report = "\n".join(f"- {line}" for line in report_lines)
+    txt_report = "\n".join(report_lines)
 
     markdown = output_dir / "转写文档.md"
     txt = output_dir / "转写文档.txt"
     docx = output_dir / "转写文档.docx"
+    srt = output_dir / "转写字幕.srt"
+    write_srt(srt, cleaned)
 
     md_content = (
         f"# {title}\n\n"
         f"## 整理稿\n\n{body}\n\n"
+        f"## 处理报告\n\n{md_report}\n\n"
+        f"## 重复内容处理\n\n{dedupe_summary or '未开启重复内容去重。'}\n\n"
+        f"## 画面字幕参考\n\n{subtitle_reference or '未识别到可用字幕。'}\n\n"
         f"## 时间线原文\n\n{timeline}\n"
     )
     markdown.write_text(md_content, encoding="utf-8")
-    txt.write_text(f"{title}\n\n整理稿\n\n{body}\n\n时间线原文\n\n{timeline}\n", encoding="utf-8")
+    txt.write_text(
+        f"{title}\n\n整理稿\n\n{body}\n\n处理报告\n\n{txt_report}\n\n重复内容处理\n\n{dedupe_summary or '未开启重复内容去重。'}\n\n画面字幕参考\n\n{subtitle_reference or '未识别到可用字幕。'}\n\n时间线原文\n\n{timeline}\n",
+        encoding="utf-8"
+    )
 
     doc = Document()
     doc.add_heading(title, level=1)
@@ -249,13 +1191,23 @@ def write_outputs(output_dir, source_path, cleaned, language, style):
             doc.add_paragraph(paragraph[2:], style="List Bullet")
         elif paragraph.strip():
             doc.add_paragraph(paragraph)
+    doc.add_heading("处理报告", level=2)
+    for line in report_lines:
+        doc.add_paragraph(line)
+    if subtitle_reference:
+        doc.add_heading("画面字幕参考", level=2)
+        for line in subtitle_reference.splitlines():
+            doc.add_paragraph(line)
+    doc.add_heading("重复内容处理", level=2)
+    doc.add_paragraph(dedupe_summary or "未开启重复内容去重。")
     doc.add_heading("时间线原文", level=2)
     for line in timeline.splitlines():
         doc.add_paragraph(line)
-    doc.add_paragraph(f"识别语言：{language}；整理方式：{style}")
+    doc.add_paragraph(f"识别语言：{language}；整理方式：{style}；智能整理：{organizer_used}")
     doc.save(docx)
+    emit_progress("document", 98, "转写文档已生成。")
 
-    return markdown, txt, docx, body
+    return markdown, txt, docx, srt, body, organizer_used, organizer_report
 
 
 def main():
@@ -265,34 +1217,110 @@ def main():
     parser.add_argument("--language", default="zh")
     parser.add_argument("--model", default="small")
     parser.add_argument("--style", default="clean")
+    parser.add_argument("--organizer", default="local", choices=["local", "openclaw", "localai", "cloudai"])
+    parser.add_argument("--openclaw-bin", default="openclaw")
+    parser.add_argument("--openclaw-model", default="")
+    parser.add_argument("--local-ai-base-url", default="")
+    parser.add_argument("--local-ai-model", default="")
+    parser.add_argument("--cloud-ai-base-url", default="")
+    parser.add_argument("--cloud-ai-model", default="")
+    parser.add_argument("--subtitle-mode", default="off", choices=["off", "auto"])
+    parser.add_argument("--dedupe-mode", default="normal", choices=["off", "normal", "strong"])
+    parser.add_argument("--document-template", default="general", choices=list(DOCUMENT_TEMPLATES.keys()))
+    parser.add_argument("--segments-json", default="")
+    parser.add_argument("--glossary-text", default="")
     args = parser.parse_args()
+
+    global DIALECT_HOTWORDS
+    args.glossary_text, dialect_hotwords = split_dialect_directive(args.glossary_text)
+    if dialect_hotwords is not None:
+        os.environ["TRANSCRIBE_STUDIO_DIALECT"] = "1"
+        DIALECT_HOTWORDS = dialect_hotwords
+        emit("[提示] 检测到「#方言」指令：本次改用方言引擎（Qwen3-ASR）。")
 
     input_path = Path(args.input).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    ffmpeg = find_ffmpeg()
-    audio_path = output_dir / "audio.wav"
-    extract_audio(ffmpeg, input_path, audio_path)
+    if args.segments_json:
+        emit("正在复用已有逐字稿换模板生成文档...")
+        emit_progress("organize", 72, "正在复用已有逐字稿换模板生成文档...")
+        segments_path = Path(args.segments_json).expanduser().resolve()
+        cleaned = json.loads(segments_path.read_text(encoding="utf-8"))
+        cleaned = clean_segments(cleaned, args.style)
+        cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        cleaned, glossary_report = apply_glossary(cleaned, args.glossary_text)
+        detected_language = args.language or "zh"
+        dedupe_report = {"mode": "off", "removed": 0, "notes": ["换模板生成复用已处理逐字稿，未重新执行语音识别和去重。"]}
+        subtitles = []
+        subtitle_reference_file = output_dir / "字幕参考.txt"
+        subtitle_reference_file.write_text("", encoding="utf-8")
+    else:
+        ffmpeg = find_ffmpeg()
+        ffprobe = find_ffprobe(ffmpeg)
+        duration = media_duration(ffprobe, input_path)
+        audio_path = output_dir / "audio.wav"
+        extract_audio(ffmpeg, input_path, audio_path)
 
-    engine = load_engine(args.model, args.language)
-    emit("正在进行 AI 语音识别...")
-    segments, detected_language = engine(audio_path)
-    cleaned = clean_segments(segments, args.style)
+        engine = load_engine(args.model, args.language)
+        emit("正在进行 AI 语音识别...")
+        emit_progress("transcribe", 22, "正在进行 AI 语音识别...", current=0, total=duration if duration > 0 else None)
+        segments, detected_language = engine(audio_path, duration)
+        cleaned = clean_segments(segments, args.style)
+        cleaned = [{**item, "text": to_simplified(item["text"])} for item in cleaned]
+        cleaned, glossary_report = apply_glossary(cleaned, args.glossary_text)
+        cleaned, dedupe_report = dedupe_segments(cleaned, args.dedupe_mode)
+
+        subtitles = []
+        subtitle_reference_file = output_dir / "字幕参考.txt"
+        if args.subtitle_mode == "auto":
+            try:
+                frames = extract_subtitle_frames(ffmpeg, ffprobe, input_path, output_dir)
+                subtitles = recognize_subtitles(frames, output_dir)
+                emit(f"字幕辅助识别完成：{len(subtitles)} 条参考字幕。")
+            except Exception as error:
+                subtitle_reference_file.write_text("", encoding="utf-8")
+                emit(f"字幕辅助识别不可用，已继续使用纯音频转写：{error}")
+        else:
+            subtitle_reference_file.write_text("", encoding="utf-8")
 
     raw_json = output_dir / "segments.json"
     raw_json.write_text(json.dumps(cleaned, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    markdown, txt, docx, body = write_outputs(output_dir, input_path, cleaned, detected_language, args.style)
+    markdown, txt, docx, srt, body, organizer_used, organizer_report = write_outputs(
+        output_dir,
+        input_path,
+        cleaned,
+        detected_language,
+        args.style,
+        args.organizer,
+        args.openclaw_bin,
+        args.openclaw_model,
+        args.local_ai_base_url,
+        args.local_ai_model,
+        args.cloud_ai_base_url,
+        args.cloud_ai_model,
+        subtitles,
+        dedupe_report,
+        args.document_template,
+        glossary_report,
+    )
     summary = body.splitlines()[0][:120] if body else "已完成转写。"
+    emit_progress("done", 100, "转写完成。")
     print(json.dumps({
         "output_dir": str(output_dir),
         "markdown": str(markdown),
         "txt": str(txt),
         "docx": str(docx),
+        "srt": str(srt),
         "segments": str(raw_json),
         "summary": summary,
         "language": detected_language,
+        "organizer": organizer_used,
+        "processing_report": organizer_report,
+        "dedupe": dedupe_report,
+        "subtitles": str(subtitle_reference_file),
+        "subtitle_count": len(subtitles),
     }, ensure_ascii=False), flush=True)
 
 
