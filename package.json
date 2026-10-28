@@ -1,6 +1,6 @@
 {
   "name": "lingxi-ai-transcribe",
-  "version": "0.2.30",
+  "version": "0.2.31",
   "description": "零析AI 转写：本机录屏、音视频转写、智能整理和文档导出工具。",
   "main": "src/main.js",
   "author": "Local",
