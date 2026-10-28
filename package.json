@@ -38,6 +38,10 @@
         "to": "native/bin/subtitle-ocr"
       },
       {
+        "from": "cli",
+        "to": "bin"
+      },
+      {
         "from": "python",
         "to": "python"
       },
