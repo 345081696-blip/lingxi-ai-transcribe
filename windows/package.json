@@ -36,6 +36,10 @@
     ],
     "extraResources": [
       {
+        "from": "cli",
+        "to": "bin"
+      },
+      {
         "from": "extra/ffmpeg",
         "to": "ffmpeg"
       },

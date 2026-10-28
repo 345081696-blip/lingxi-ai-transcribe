@@ -1,0 +1,103 @@
+#!/bin/sh
+# 零析AI 转写 · AI/命令行调用入口（macOS）
+#
+# 由产品随包分发，自动定位随包的 Python、转写脚本、ffmpeg 与模型。
+# 任何能执行 shell 的 AI agent 都可以直接调用本文件，无需安装额外依赖。
+#
+# 典型用法：
+#   lingxi-transcribe --input /path/to/video.mp4 --output-dir /path/to/out --language zh
+#
+# 成功后 stdout 最后一行是 JSON 结果；进度事件在 stderr，前缀 __LC_PROGRESS__。
+set -e
+
+# ---- 解析本脚本真实路径（兼容软链 / 被 symlink 到 PATH 的情况）----
+SELF="$0"
+if command -v readlink >/dev/null 2>&1; then
+  while [ -L "$SELF" ]; do
+    LINK=$(readlink "$SELF")
+    case "$LINK" in
+      /*) SELF="$LINK" ;;
+      *)  SELF="$(dirname "$SELF")/$LINK" ;;
+    esac
+  done
+fi
+BIN_DIR=$(cd "$(dirname "$SELF")" && pwd)
+
+# ---- 资源根 ----
+# 打包后：<App>.app/Contents/Resources/bin/  ->  <App>.app/Contents/Resources
+# 开发态：<repo>/cli/                        ->  <repo>
+RES_DIR=$(cd "$BIN_DIR/.." && pwd)
+
+PY="$RES_DIR/python-standalone/bin/python3"
+SCRIPT="$RES_DIR/python/transcribe.py"
+MODEL_DIR="$RES_DIR/python/models/small"
+
+# ffmpeg：打包后在 resources/ffmpeg，开发态在 extra/ffmpeg。
+# 只认「真能跑」的：随包二进制可能是异架构（如 x86_64 装在 arm64 机上），
+# 跑不起来（bad CPU type 等）就退回系统 ffmpeg，避免一手好牌打废。
+pick_ffmpeg() {
+  for c in "$RES_DIR/ffmpeg/ffmpeg" "$RES_DIR/extra/ffmpeg/ffmpeg"; do
+    if [ -x "$c" ] && "$c" -version >/dev/null 2>&1; then
+      printf '%s' "$c"
+      return 0
+    fi
+  done
+  command -v ffmpeg 2>/dev/null || true
+}
+FFMPEG=$(pick_ffmpeg)
+
+# 开发态兜底：允许 python-standalone 缺失时用系统 python3
+[ -x "$PY" ] || PY=$(command -v python3 || true)
+
+# ---- 友好帮助（面向 AI / 人）----
+case "${1:-}" in
+  --ai-help|ai-help)
+    cat <<EOF
+零析AI 转写 · AI 调用入口
+
+用法：
+  lingxi-transcribe --input <视频/音频> --output-dir <输出目录> [选项]
+
+必填：
+  --input <文件>          视频或音频路径（mp4/mov/mkv/mp3/wav/m4a/aiff 等，ffmpeg 能读即可）
+  --output-dir <目录>     输出目录（不存在会自动建）
+
+常用选项：
+  --language zh|auto      语言，默认 zh
+  --model <名称或路径>    默认使用随包模型 small（离线）
+  --organizer local|openclaw|localai|cloudai
+                          降噪整理方式，local=纯本机（默认，不上传）
+  --subtitle-mode off|auto 画面硬字幕 OCR 辅助校正
+  --dedupe-mode off|normal|strong
+  --document-template general|live_recap|course_notes|material_extract|sales_script|quotes
+
+输出：
+  stdout 最后一行 = JSON 摘要（含 markdown/txt/docx/srt/segments 的绝对路径）
+  stderr = 进度事件，前缀 __LC_PROGRESS__
+  典型产物：转写文档.md / .txt / .docx、转写字幕.srt、segments.json
+
+资源：
+  运行时  $PY
+  脚本    $SCRIPT
+  ffmpeg  $FFMPEG
+  模型    $MODEL_DIR
+EOF
+    exit 0
+    ;;
+esac
+
+# ---- 若调用方未指定 --model，默认用随包模型，保证离线可跑 ----
+HAS_MODEL=0
+for a in "$@"; do
+  [ "$a" = "--model" ] && HAS_MODEL=1
+done
+if [ "$HAS_MODEL" = "0" ] && [ -d "$MODEL_DIR" ]; then
+  set -- "$@" --model "$MODEL_DIR"
+fi
+
+# ---- 环境变量：与 App 主进程保持同一套约定 ----
+[ -x "$PY" ] && export TRANSCRIBE_STUDIO_PYTHON="$PY"
+[ -x "$FFMPEG" ] && export TRANSCRIBE_STUDIO_FFMPEG="$FFMPEG"
+export PATH="$RES_DIR/ffmpeg:$RES_DIR/extra/ffmpeg:$(dirname "$PY"):$PATH"
+
+exec "$PY" "$SCRIPT" "$@"
